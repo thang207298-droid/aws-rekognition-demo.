@@ -10,10 +10,11 @@ from PIL import Image
 st.set_page_config(page_title="AWS AI Multi-Tool", layout="centered")
 st.title("🤖 AWS AI - Chuyển Đa Phương Tiện Thành Văn Bản & Phân Tích")
 
-# Cấu hình AWS Keys từ Streamlit Secrets
+# Cấu hình cố định AWS Keys & S3 Bucket
 aws_access_key = st.secrets.get("AWS_ACCESS_KEY_ID")
 aws_secret_key = st.secrets.get("AWS_SECRET_ACCESS_KEY")
-region = "us-east-1"  # Khuyên dùng us-east-1 để hỗ trợ tốt nhất các dịch vụ AI
+region = "us-east-1"
+S3_BUCKET_NAME = "my-transcribe-audio-bucket-2026"  # Đã cấu hình cố định ở đây
 
 option = st.sidebar.selectbox(
     "Chọn tính năng AI",
@@ -21,20 +22,17 @@ option = st.sidebar.selectbox(
 )
 
 # ---------------------------------------------------------
-# TÍNH NĂNG 1: BÓC BẰNG AUDIO / VIDEO (AWS TRANSCRIBE BATCH)
+# TÍNH NĂNG 1: BÓC BẰNG AUDIO / VIDEO (AWS TRANSCRIBE)
 # ---------------------------------------------------------
 if option == "1. Phân tích Audio/Video (Transcribe)":
     st.header("🎙️ Bóc Băng File Âm Thanh & Video")
     
-    s3_bucket_name = st.text_input("Nhập tên S3 Bucket của bạn:", value="")
-    
-    # Bổ sung đầy đủ các đuôi file âm thanh & video
     uploaded_file = st.file_uploader(
         "Tải lên file Audio hoặc Video", 
         type=["mp3", "mp4", "wav", "m4a", "aac", "flac", "ogg", "mov", "avi", "mkv", "webm"]
     )
 
-    if uploaded_file and s3_bucket_name:
+    if uploaded_file:
         ext = uploaded_file.name.split(".")[-1].lower()
         
         # Xem trước file media
@@ -64,12 +62,12 @@ if option == "1. Phân tích Audio/Video (Transcribe)":
                     # 1. Upload file lên S3
                     file_name = f"uploads/{uuid.uuid4()}_{uploaded_file.name}"
                     with st.spinner("1/3. Đang tải file lên AWS S3..."):
-                        s3_client.upload_fileobj(uploaded_file, s3_bucket_name, file_name)
+                        s3_client.upload_fileobj(uploaded_file, S3_BUCKET_NAME, file_name)
                     
-                    file_uri = f"s3://{s3_bucket_name}/{file_name}"
+                    file_uri = f"s3://{S3_BUCKET_NAME}/{file_name}"
                     job_name = f"transcribe_job_{int(time.time())}"
 
-                    # Chuẩn hóa định dạng MediaFormat cho AWS Transcribe
+                    # Chuẩn hóa định dạng MediaFormat
                     media_format_map = {
                         "mp3": "mp3", "mp4": "mp4", "wav": "wav", "flac": "flac", 
                         "ogg": "ogg", "webm": "webm", "m4a": "mp4", "aac": "mp4", 
@@ -83,10 +81,9 @@ if option == "1. Phân tích Audio/Video (Transcribe)":
                             TranscriptionJobName=job_name,
                             Media={"MediaFileUri": file_uri},
                             MediaFormat=media_format,
-                            LanguageCode="vi-VN",  # Mặc định tiếng Việt (Đổi thành "en-US" nếu file tiếng Anh)
+                            LanguageCode="vi-VN",
                         )
 
-                        # Vòng lặp chờ AWS xử lý hoàn tất
                         while True:
                             status = transcribe_client.get_transcription_job(
                                 TranscriptionJobName=job_name
