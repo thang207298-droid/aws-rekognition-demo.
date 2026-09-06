@@ -2,7 +2,8 @@ import io
 import tempfile
 import boto3
 import streamlit as st
-import whisper
+import speech_recognition as sr
+from pydub import AudioSegment
 from PIL import Image
 
 st.set_page_config(page_title="AI Multi-Tool", layout="centered")
@@ -13,25 +14,18 @@ aws_access_key = st.secrets.get("AWS_ACCESS_KEY_ID")
 aws_secret_key = st.secrets.get("AWS_SECRET_ACCESS_KEY")
 region = "us-east-1"
 
-
-@st.cache_resource
-def load_whisper_model():
-    # Dùng base để tiết kiệm RAM, tránh sập app Streamlit
-    return whisper.load_model("base")
-
-
 option = st.sidebar.selectbox(
     "Chọn tính năng AI",
     [
-        "1. Phân Tích Audio/Video (Whisper AI)",
+        "1. Phân Tích Audio/Video (AI Speech Recognition)",
         "2. Nhận diện Hình ảnh (AWS Rekognition)",
     ],
 )
 
 # ---------------------------------------------------------
-# TÍNH NĂNG 1: BÓC BẰNG & PHÂN TÍCH AUDIO / VIDEO
+# TÍNH NĂNG 1: BÓC BẰNG AUDIO / VIDEO
 # ---------------------------------------------------------
-if option == "1. Phân Tích Audio/Video (Whisper AI)":
+if option == "1. Phân Tích Audio/Video (AI Speech Recognition)":
     st.header("🎙️ Bóc Băng Âm Thanh / Video")
 
     uploaded_file = st.file_uploader(
@@ -61,44 +55,41 @@ if option == "1. Phân Tích Audio/Video (Whisper AI)":
 
         if st.button("Bắt đầu bóc băng & Phân tích"):
             try:
-                with st.spinner("1/2. Đang tải mô hình AI Whisper (Base)..."):
-                    model = load_whisper_model()
+                with st.spinner("Đang chuyển đổi định dạng và bóc băng âm thanh..."):
+                    # Lưu file tạm
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp_file:
+                        tmp_file.write(uploaded_file.read())
+                        tmp_path = tmp_file.name
 
-                with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=f".{ext}"
-                ) as tmp_file:
-                    tmp_file.write(uploaded_file.read())
-                    tmp_path = tmp_file.name
+                    # Convert audio sang WAV chuẩn PCM cho SpeechRecognition
+                    audio_segment = AudioSegment.from_file(tmp_path)
+                    wav_path = tmp_path + ".wav"
+                    audio_segment.export(wav_path, format="wav")
 
-                with st.spinner("2/2. AI đang bóc băng toàn bộ âm thanh..."):
-                    # Ép xử lý tiếng Anh chính xác và tránh bị lặp ký tự khi ngắt giọng
-                    result = model.transcribe(
-                        tmp_path,
-                        language="en",
-                        task="transcribe",
-                        fp16=False,
-                        no_speech_threshold=0.6,
-                        condition_on_previous_text=False
-                    )
-
-                text_output = result["text"].strip()
+                    # Bóc băng giọng nói
+                    recognizer = sr.Recognizer()
+                    with sr.AudioFile(wav_path) as source:
+                        audio_data = recognizer.record(source)
+                        
+                        # Tự động nhận diện giọng nói tiếng Anh
+                        text_output = recognizer.recognize_google(audio_data, language="en-US")
 
                 st.success("Xử lý hoàn tất!")
-                st.subheader("📝 1. Văn bản trích xuất nguyên bản:")
+                st.subheader("📝 Văn bản trích xuất nguyên bản:")
                 if text_output:
                     st.write(text_output)
 
-                    # PHẦN PHÂN TÍCH CHỈ SỐ NỘI DUNG
                     st.divider()
-                    st.subheader("🔍 2. Kết quả phân tích âm thanh:")
-                    
+                    st.subheader("🔍 Kết quả phân tích âm thanh:")
                     word_count = len(text_output.split())
                     st.write(f"• **Tổng số từ chép được:** {word_count} từ")
-                    st.write("• **Ngôn ngữ xử lý:** Tiếng Anh (EN)")
+                    st.write("• **Ngôn ngữ xử lý:** Tiếng Anh (en-US)")
 
                 else:
                     st.write("Không nhận diện được nội dung thoại trong file.")
 
+            except sr.UnknownValueError:
+                st.error("Không thể nhận diện âm thanh trong file. Hãy kiểm tra lại micro hoặc độ rõ của giọng nói.")
             except Exception as e:
                 st.error(f"Lỗi xử lý: {e}")
 
