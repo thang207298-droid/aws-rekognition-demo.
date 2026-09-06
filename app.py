@@ -6,9 +6,9 @@ import whisper
 from PIL import Image
 
 st.set_page_config(page_title="AI Multi-Tool", layout="centered")
-st.title("🤖 Ứng Dụng AI - Bóc Băng Video/Audio & Nhận Diện Ảnh")
+st.title("🤖 Ứng Dụng AI - Bóc Băng & Phân Tích Đa Phương Tiện")
 
-# Cấu hình AWS Keys từ Streamlit Secrets cho Rekognition
+# Cấu hình AWS Keys từ Streamlit Secrets
 aws_access_key = st.secrets.get("AWS_ACCESS_KEY_ID")
 aws_secret_key = st.secrets.get("AWS_SECRET_ACCESS_KEY")
 region = "us-east-1"
@@ -16,23 +16,22 @@ region = "us-east-1"
 
 @st.cache_resource
 def load_whisper_model():
-    # Tải mô hình Whisper nhẹ, chạy nhanh
     return whisper.load_model("base")
 
 
 option = st.sidebar.selectbox(
     "Chọn tính năng AI",
     [
-        "1. Bóc Băng Audio/Video (Whisper AI)",
+        "1. Phân Tích Audio/Video (Whisper AI)",
         "2. Nhận diện Hình ảnh (AWS Rekognition)",
     ],
 )
 
 # ---------------------------------------------------------
-# TÍNH NĂNG 1: BÓC BẰNG AUDIO / VIDEO (WHISPER AI)
+# TÍNH NĂNG 1: BÓC BẰNG & PHÂN TÍCH AUDIO / VIDEO
 # ---------------------------------------------------------
-if option == "1. Bóc Băng Audio/Video (Whisper AI)":
-    st.header("🎙️ Bóc Băng File Âm Thanh & Video")
+if option == "1. Phân Tích Audio/Video (Whisper AI)":
+    st.header("🎙️ Bóc Băng & Phân Tích Âm Thanh / Video")
 
     uploaded_file = st.file_uploader(
         "Tải lên file Audio hoặc Video",
@@ -54,36 +53,52 @@ if option == "1. Bóc Băng Audio/Video (Whisper AI)":
     if uploaded_file:
         ext = uploaded_file.name.split(".")[-1].lower()
 
-        # Xem trước file media
         if ext in ["mp3", "wav", "m4a", "aac", "flac", "ogg"]:
             st.audio(uploaded_file)
         else:
             st.video(uploaded_file)
 
-        if st.button("Bắt đầu bóc băng ngay"):
+        if st.button("Bắt đầu bóc băng & Phân tích"):
             try:
-                with st.spinner("1/2. Đang tải mô hình AI Whisper..."):
+                with st.spinner("1/2. Đang tải mô hình AI..."):
                     model = load_whisper_model()
 
-                # Lưu tạm file để Whisper đọc
                 with tempfile.NamedTemporaryFile(
                     delete=False, suffix=f".{ext}"
                 ) as tmp_file:
                     tmp_file.write(uploaded_file.read())
                     tmp_path = tmp_file.name
 
-                with st.spinner(
-                    "2/2. AI đang lắng nghe và trích xuất văn bản..."
-                ):
+                with st.spinner("2/2. AI đang bóc băng & phân tích nội dung..."):
                     result = model.transcribe(tmp_path, language="vi")
 
+                text_output = result["text"].strip()
+
                 st.success("Xử lý hoàn tất!")
-                st.subheader("📝 Văn bản trích xuất:")
-                st.write(
-                    result["text"]
-                    if result["text"]
-                    else "Không nhận diện được nội dung thoại."
-                )
+                st.subheader("📝 1. Văn bản trích xuất:")
+                if text_output:
+                    st.write(text_output)
+
+                    # PHẦN PHÂN TÍCH NỘI DUNG TỰ ĐỘNG
+                    st.divider()
+                    st.subheader("🔍 2. Kết quả phân tích âm thanh:")
+                    
+                    # Thống kê cơ bản
+                    word_count = len(text_output.split())
+                    st.write(f"• **Số lượng từ phát hiện:** {word_count} từ")
+                    
+                    # Phân tích cảm xúc sơ bộ qua từ vựng
+                    positive_words = ["tốt", "vui", "tuyệt", "thích", "thành công", "cảm ơn", "ok", "được"]
+                    negative_words = ["lỗi", "buồn", "kém", "chán", "hỏng", "không", "thất bại"]
+                    
+                    has_pos = any(w in text_output.lower() for w in positive_words)
+                    has_neg = any(w in text_output.lower() for w in negative_words)
+                    
+                    sentiment = "Tích cực 😀" if has_pos and not has_neg else ("Tiêu cực 🙁" if has_neg else "Trung tính / Bình thường 😐")
+                    st.write(f"• **Sắc thái giọng nói / Nội dung:** {sentiment}")
+
+                else:
+                    st.write("Không nhận diện được nội dung thoại trong file.")
 
             except Exception as e:
                 st.error(f"Lỗi xử lý: {e}")
