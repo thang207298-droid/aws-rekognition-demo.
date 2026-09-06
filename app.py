@@ -16,7 +16,7 @@ region = "us-east-1"
 
 @st.cache_resource
 def load_whisper_model():
-    # Nâng cấp lên mô hình small để nhận diện chính xác và giảm ảo giác
+    # Sử dụng mô hình small để nghe chính xác nội dung dài
     return whisper.load_model("small")
 
 
@@ -29,10 +29,10 @@ option = st.sidebar.selectbox(
 )
 
 # ---------------------------------------------------------
-# TÍNH NĂNG 1: BÓC BẰNG & PHÂN TÍCH AUDIO / VIDEO
+# TÍNH NĂNG 1: BÓC BĂNG & PHÂN TÍCH AUDIO / VIDEO
 # ---------------------------------------------------------
 if option == "1. Phân Tích Audio/Video (Whisper AI)":
-    st.header("🎙️ Bóc Băng & Phân Tích Âm Thanh / Video")
+    st.header("🎙️ Bóc Băng Âm Thanh / Video")
 
     uploaded_file = st.file_uploader(
         "Tải lên file Audio hoặc Video",
@@ -70,53 +70,31 @@ if option == "1. Phân Tích Audio/Video (Whisper AI)":
                     tmp_file.write(uploaded_file.read())
                     tmp_path = tmp_file.name
 
-                with st.spinner("2/2. AI đang bóc băng & phân tích nội dung..."):
-                    # Ép nhận diện tiếng Việt và loại bỏ khoảng lặng nhiễu
+                with st.spinner("2/2. AI đang bóc băng toàn bộ âm thanh..."):
+                    # Tự động nhận diện ngôn ngữ gốc, không dịch thuật, giữ nguyên bản
                     result = model.transcribe(
-                        tmp_path, 
-                        language="vi", 
-                        no_speech_threshold=0.6,
-                        condition_on_previous_text=False
+                        tmp_path,
+                        task="transcribe",
+                        fp16=False,
+                        temperature=0.0
                     )
 
                 text_output = result["text"].strip()
 
                 st.success("Xử lý hoàn tất!")
-                st.subheader("📝 1. Văn bản trích xuất:")
+                st.subheader("📝 1. Văn bản trích xuất nguyên bản:")
                 if text_output:
                     st.write(text_output)
 
-                    # PHẦN PHÂN TÍCH CHỦ ĐỀ & NỘI DUNG TỰ ĐỘNG
+                    # PHẦN PHÂN TÍCH CHỈ SỐ NỘI DUNG
                     st.divider()
                     st.subheader("🔍 2. Kết quả phân tích âm thanh:")
                     
                     word_count = len(text_output.split())
-                    st.write(f"• **Số lượng từ phát hiện:** {word_count} từ")
+                    st.write(f"• **Tổng số từ chép được:** {word_count} từ")
                     
-                    # Tóm tắt & Phân tích Chủ đề
-                    text_lower = text_output.lower()
-                    topics = []
-                    if any(w in text_lower for w in ["học", "bài", "trường", "sinh viên", "thầy", "cô", "thi", "lớp"]):
-                        topics.append("Giáo dục / Học tập 📚")
-                    if any(w in text_lower for w in ["máy tính", "phần mềm", "code", "aws", "cloud", "chương trình", "compile", "lỗi"]):
-                        topics.append("Công nghệ / Lập trình 💻")
-                    if any(w in text_lower for w in ["tiền", "mua", "bán", "giá", "chi phí", "tài khoản"]):
-                        topics.append("Kinh tế / Tài chính 💰")
-                    if any(w in text_lower for w in ["game", "chơi", "chát", "bạn", "xem", "video"]):
-                        topics.append("Giải trí / Trò chuyện 🎮")
-                    
-                    main_topic = ", ".join(topics) if topics else "Hội thoại / Thảo luận chung 🗣️"
-                    st.write(f"• **Chủ đề chính được phát hiện:** {main_topic}")
-
-                    # Sắc thái nội dung
-                    positive_words = ["tốt", "vui", "tuyệt", "thích", "thành công", "cảm ơn", "ok", "được"]
-                    negative_words = ["lỗi", "buồn", "kém", "chán", "hỏng", "không", "thất bại"]
-                    
-                    has_pos = any(w in text_lower for w in positive_words)
-                    has_neg = any(w in text_lower for w in negative_words)
-                    
-                    sentiment = "Tích cực 😀" if has_pos and not has_neg else ("Tiêu cực 🙁" if has_neg else "Trung tính / Bình thường 😐")
-                    st.write(f"• **Sắc thái nội dung:** {sentiment}")
+                    detected_lang = result.get("language", "Không xác định").upper()
+                    st.write(f"• **Ngôn ngữ AI nhận diện:** {detected_lang}")
 
                 else:
                     st.write("Không nhận diện được nội dung thoại trong file.")
