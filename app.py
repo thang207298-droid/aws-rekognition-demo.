@@ -1,119 +1,98 @@
 import io
-import json
-import time
-import uuid
+import tempfile
 import boto3
-import requests
 import streamlit as st
+import whisper
 from PIL import Image
 
-st.set_page_config(page_title="AWS AI Multi-Tool", layout="centered")
-st.title("🤖 AWS AI - Chuyển Đa Phương Tiện Thành Văn Bản & Phân Tích")
+st.set_page_config(page_title="AI Multi-Tool", layout="centered")
+st.title("🤖 Ứng Dụng AI - Bóc Băng Video/Audio & Nhận Diện Ảnh")
 
-# Cấu hình cố định AWS Keys & S3 Bucket
+# Cấu hình AWS Keys từ Streamlit Secrets cho Rekognition
 aws_access_key = st.secrets.get("AWS_ACCESS_KEY_ID")
 aws_secret_key = st.secrets.get("AWS_SECRET_ACCESS_KEY")
 region = "us-east-1"
-S3_BUCKET_NAME = "my-transcribe-audio-bucket-2026"  # Đã cấu hình cố định ở đây
+
+
+@st.cache_resource
+def load_whisper_model():
+    # Tải mô hình Whisper nhẹ, chạy nhanh
+    return whisper.load_model("base")
+
 
 option = st.sidebar.selectbox(
     "Chọn tính năng AI",
-    ["1. Phân tích Audio/Video (Transcribe)", "2. Nhận diện Hình ảnh (Rekognition)"],
+    [
+        "1. Bóc Băng Audio/Video (Whisper AI)",
+        "2. Nhận diện Hình ảnh (AWS Rekognition)",
+    ],
 )
 
 # ---------------------------------------------------------
-# TÍNH NĂNG 1: BÓC BẰNG AUDIO / VIDEO (AWS TRANSCRIBE)
+# TÍNH NĂNG 1: BÓC BẰNG AUDIO / VIDEO (WHISPER AI)
 # ---------------------------------------------------------
-if option == "1. Phân tích Audio/Video (Transcribe)":
+if option == "1. Bóc Băng Audio/Video (Whisper AI)":
     st.header("🎙️ Bóc Băng File Âm Thanh & Video")
-    
+
     uploaded_file = st.file_uploader(
-        "Tải lên file Audio hoặc Video", 
-        type=["mp3", "mp4", "wav", "m4a", "aac", "flac", "ogg", "mov", "avi", "mkv", "webm"]
+        "Tải lên file Audio hoặc Video",
+        type=[
+            "mp3",
+            "mp4",
+            "wav",
+            "m4a",
+            "aac",
+            "flac",
+            "ogg",
+            "mov",
+            "avi",
+            "mkv",
+            "webm",
+        ],
     )
 
     if uploaded_file:
         ext = uploaded_file.name.split(".")[-1].lower()
-        
+
         # Xem trước file media
         if ext in ["mp3", "wav", "m4a", "aac", "flac", "ogg"]:
             st.audio(uploaded_file)
         else:
             st.video(uploaded_file)
 
-        if st.button("Bắt đầu xử lý bằng AWS AI"):
-            if not aws_access_key or not aws_secret_key:
-                st.error("Chưa cấu hình AWS Keys trong Streamlit Secrets!")
-            else:
-                try:
-                    s3_client = boto3.client(
-                        "s3",
-                        aws_access_key_id=aws_access_key,
-                        aws_secret_access_key=aws_secret_key,
-                        region_name=region,
-                    )
-                    transcribe_client = boto3.client(
-                        "transcribe",
-                        aws_access_key_id=aws_access_key,
-                        aws_secret_access_key=aws_secret_key,
-                        region_name=region,
-                    )
+        if st.button("Bắt đầu bóc băng ngay"):
+            try:
+                with st.spinner("1/2. Đang tải mô hình AI Whisper..."):
+                    model = load_whisper_model()
 
-                    # 1. Upload file lên S3
-                    file_name = f"uploads/{uuid.uuid4()}_{uploaded_file.name}"
-                    with st.spinner("1/3. Đang tải file lên AWS S3..."):
-                        s3_client.upload_fileobj(uploaded_file, S3_BUCKET_NAME, file_name)
-                    
-                    file_uri = f"s3://{S3_BUCKET_NAME}/{file_name}"
-                    job_name = f"transcribe_job_{int(time.time())}"
+                # Lưu tạm file để Whisper đọc
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=f".{ext}"
+                ) as tmp_file:
+                    tmp_file.write(uploaded_file.read())
+                    tmp_path = tmp_file.name
 
-                    # Chuẩn hóa định dạng MediaFormat
-                    media_format_map = {
-                        "mp3": "mp3", "mp4": "mp4", "wav": "wav", "flac": "flac", 
-                        "ogg": "ogg", "webm": "webm", "m4a": "mp4", "aac": "mp4", 
-                        "mov": "mp4", "avi": "mp4", "mkv": "mp4"
-                    }
-                    media_format = media_format_map.get(ext, "mp4")
+                with st.spinner(
+                    "2/2. AI đang lắng nghe và trích xuất văn bản..."
+                ):
+                    result = model.transcribe(tmp_path)
 
-                    # 2. Gửi Job bóc băng cho AWS Transcribe
-                    with st.spinner("2/3. AWS Transcribe đang phân tích và chuyển file thành văn bản..."):
-                        transcribe_client.start_transcription_job(
-                            TranscriptionJobName=job_name,
-                            Media={"MediaFileUri": file_uri},
-                            MediaFormat=media_format,
-                            LanguageCode="vi-VN",
-                        )
+                st.success("Xử lý hoàn tất!")
+                st.subheader("📝 Văn bản trích xuất:")
+                st.write(
+                    result["text"]
+                    if result["text"]
+                    else "Không nhận diện được nội dung thoại."
+                )
 
-                        while True:
-                            status = transcribe_client.get_transcription_job(
-                                TranscriptionJobName=job_name
-                            )
-                            job_status = status["TranscriptionJob"]["TranscriptionJobStatus"]
-                            if job_status in ["COMPLETED", "FAILED"]:
-                                break
-                            time.sleep(3)
-
-                    # 3. Lấy kết quả văn bản
-                    if job_status == "COMPLETED":
-                        transcript_uri = status["TranscriptionJob"]["Transcript"]["TranscriptFileUri"]
-                        response = requests.get(transcript_uri)
-                        data = response.json()
-                        transcript_text = data["results"]["transcripts"][0]["transcript"]
-
-                        st.success("3/3. Xử lý hoàn tất!")
-                        st.subheader("📝 Văn bản trích xuất từ AWS Transcribe:")
-                        st.write(transcript_text if transcript_text else "Không nhận diện được nội dung thoại.")
-                    else:
-                        st.error("Không thể hoàn tất tiến trình phân tích âm thanh trên AWS.")
-
-                except Exception as e:
-                    st.error(f"Lỗi hệ thống AWS: {e}")
+            except Exception as e:
+                st.error(f"Lỗi xử lý: {e}")
 
 # ---------------------------------------------------------
 # TÍNH NĂNG 2: NHẬN DIỆN HÌNH ẢNH (AWS REKOGNITION)
 # ---------------------------------------------------------
-elif option == "2. Nhận diện Hình ảnh (Rekognition)":
-    st.header("🖼️ Phân Tích & Nhận Diện Hình Ảnh")
+elif option == "2. Nhận diện Hình ảnh (AWS Rekognition)":
+    st.header("🖼️ Phân Tích & Nhận Diện Hình Ảnh (AWS)")
     uploaded_file = st.file_uploader(
         "Chọn ảnh để phân tích", type=["jpg", "jpeg", "png"]
     )
@@ -159,10 +138,12 @@ elif option == "2. Nhận diện Hình ảnh (Rekognition)":
                     faces = response_faces["FaceDetails"]
                     if faces:
                         st.divider()
-                        st.subheader(f"👤 Chi tiết khuôn mặt ({len(faces)} người):")
+                        st.subheader(
+                            f"👤 Chi tiết khuôn mặt ({len(faces)} người):"
+                        )
                         for idx, face in enumerate(faces):
                             st.write(
                                 f"**Người {idx+1}:** Độ tuổi khoảng {face['AgeRange']['Low']} - {face['AgeRange']['High']} | Cảm xúc: {face['Emotions'][0]['Type']}"
                             )
                 except Exception as e:
-                    st.error(f"Lỗi: {e}")
+                    st.error(f"Lỗi AWS Rekognition: {e}")
