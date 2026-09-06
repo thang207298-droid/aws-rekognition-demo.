@@ -16,7 +16,6 @@ region = "us-east-1"
 
 @st.cache_resource
 def load_whisper_model():
-    # Sử dụng mô hình small để nghe chính xác nội dung dài
     return whisper.load_model("small")
 
 
@@ -29,7 +28,7 @@ option = st.sidebar.selectbox(
 )
 
 # ---------------------------------------------------------
-# TÍNH NĂNG 1: BÓC BĂNG & PHÂN TÍCH AUDIO / VIDEO
+# TÍNH NĂNG 1: BÓC BẰNG & PHÂN TÍCH AUDIO / VIDEO
 # ---------------------------------------------------------
 if option == "1. Phân Tích Audio/Video (Whisper AI)":
     st.header("🎙️ Bóc Băng Âm Thanh / Video")
@@ -71,12 +70,14 @@ if option == "1. Phân Tích Audio/Video (Whisper AI)":
                     tmp_path = tmp_file.name
 
                 with st.spinner("2/2. AI đang bóc băng toàn bộ âm thanh..."):
-                    # Tự động nhận diện ngôn ngữ gốc, không dịch thuật, giữ nguyên bản
+                    # Cấu hình tối ưu chép chuẩn tiếng Anh, loại bỏ lỗi lặp ký tự khoảng lặng
                     result = model.transcribe(
                         tmp_path,
+                        language="en",
                         task="transcribe",
                         fp16=False,
-                        temperature=0.0
+                        no_speech_threshold=0.6,
+                        condition_on_previous_text=False
                     )
 
                 text_output = result["text"].strip()
@@ -92,9 +93,7 @@ if option == "1. Phân Tích Audio/Video (Whisper AI)":
                     
                     word_count = len(text_output.split())
                     st.write(f"• **Tổng số từ chép được:** {word_count} từ")
-                    
-                    detected_lang = result.get("language", "Không xác định").upper()
-                    st.write(f"• **Ngôn ngữ AI nhận diện:** {detected_lang}")
+                    st.write("• **Ngôn ngữ xử lý:** Tiếng Anh (EN)")
 
                 else:
                     st.write("Không nhận diện được nội dung thoại trong file.")
