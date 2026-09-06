@@ -75,7 +75,7 @@ if option == "1. Bóc Băng Audio/Video (Whisper AI)":
                 with st.spinner(
                     "2/2. AI đang lắng nghe và trích xuất văn bản..."
                 ):
-                    result = model.transcribe(tmp_path)
+                    result = model.transcribe(tmp_path, language="vi")
 
                 st.success("Xử lý hoàn tất!")
                 st.subheader("📝 Văn bản trích xuất:")
