@@ -16,7 +16,8 @@ region = "us-east-1"
 
 @st.cache_resource
 def load_whisper_model():
-    return whisper.load_model("small")
+    # Dùng base để tiết kiệm RAM, tránh sập app Streamlit
+    return whisper.load_model("base")
 
 
 option = st.sidebar.selectbox(
@@ -60,7 +61,7 @@ if option == "1. Phân Tích Audio/Video (Whisper AI)":
 
         if st.button("Bắt đầu bóc băng & Phân tích"):
             try:
-                with st.spinner("1/2. Đang tải mô hình AI Whisper (Small)..."):
+                with st.spinner("1/2. Đang tải mô hình AI Whisper (Base)..."):
                     model = load_whisper_model()
 
                 with tempfile.NamedTemporaryFile(
@@ -70,7 +71,7 @@ if option == "1. Phân Tích Audio/Video (Whisper AI)":
                     tmp_path = tmp_file.name
 
                 with st.spinner("2/2. AI đang bóc băng toàn bộ âm thanh..."):
-                    # Cấu hình tối ưu chép chuẩn tiếng Anh, loại bỏ lỗi lặp ký tự khoảng lặng
+                    # Ép xử lý tiếng Anh chính xác và tránh bị lặp ký tự khi ngắt giọng
                     result = model.transcribe(
                         tmp_path,
                         language="en",
