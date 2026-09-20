@@ -30,7 +30,7 @@ option = st.sidebar.selectbox(
 # ---------------------------------------------------------
 if option == "1. Phân Tích Hình Ảnh Đa Năng (Gemini Vision)":
     st.header("🖼️ Phân Tích Bất Kỳ Bức Ảnh Nào")
-    st.write("Tải lên ảnh bầu trời, con người, đồ vật, phong cảnh... AI sẽ phân tích chi tiết bằng Tiếng Việt.")
+    st.write("Tải lên ảnh bầu trời, con người, đồ vật, phong cảnh, bài tập... AI sẽ phân tích chi tiết bằng Tiếng Việt.")
 
     uploaded_file = st.file_uploader(
         "Chọn ảnh bất kỳ để phân tích", type=["jpg", "jpeg", "png", "webp"]
@@ -55,10 +55,10 @@ if option == "1. Phân Tích Hình Ảnh Đa Năng (Gemini Vision)":
 
                         default_prompt = (
                             "Hãy quan sát kỹ bức ảnh này và phân tích thật chi tiết bằng Tiếng Việt theo các mục sau:\n"
-                            "1. **Chủ đề chính & Tổng quan:** Bức ảnh chụp gì? (Bầu trời, con người, đồ vật, phong cảnh, thiết kế đồ họa...)\n"
+                            "1. **Chủ đề chính & Tổng quan:** Bức ảnh chụp gì? (Bầu trời, con người, đồ vật, phong cảnh, bài tập hình học...)\n"
                             "2. **Phân tích con người (nếu có):** Số lượng, độ tuổi ước tính, cảm xúc, hành động, trang phục.\n"
-                            "3. **Phân tích đối tượng / Đồ vật / Bầu trời:** Chi tiết các đối tượng xuất hiện, thời tiết/bầu trời (nếu có), màu sắc chủ đạo.\n"
-                            "4. **Nhận xét & Ngữ cảnh:** Môi trường xung quanh, không gian hoặc công dụng của đối tượng."
+                            "3. **Phân tích đối tượng / Đồ vật / Bầu trời / Hình vẽ:** Chi tiết các đối tượng xuất hiện, thời tiết/bầu trời (nếu có), ký hiệu hình học hoặc công dụng đồ vật.\n"
+                            "4. **Nhận xét & Ngữ cảnh:** Môi trường xung quanh, giải thích nội dung hoặc ngữ cảnh của bức ảnh."
                         )
 
                         prompt_to_use = user_prompt if user_prompt.strip() else default_prompt
