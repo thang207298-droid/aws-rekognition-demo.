@@ -1,3 +1,6 @@
 streamlit
-speechrecognition
+boto3
+pillow
+SpeechRecognition
 pydub
+google-genai
