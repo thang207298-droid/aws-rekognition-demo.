@@ -1,7 +1,5 @@
 import streamlit as st
-import boto3
 from PIL import Image
-import io
 import google.generativeai as genai
 
 # ==========================================
@@ -20,11 +18,6 @@ if not GEMINI_API_KEYS:
     GEMINI_API_KEYS = [single_key] if single_key else []
 
 GEMINI_MODEL_NAME = "gemini-3.6-flash"
-
-# Hardcode key AWS mới nhất để chạy trực tiếp
-AWS_ACCESS_KEY_ID = "AKIATNDZHVIUCA46OPFG"
-AWS_SECRET_ACCESS_KEY = "ĐIỀN_SECRET_KEY_CỦA_BẠN_VÀO_ĐÂY"  # Thay secret key tương ứng vào đây
-AWS_DEFAULT_REGION = "us-east-1"
 
 # Hàm gọi Gemini tự động xoay vòng key khi hết quota (429)
 def call_gemini_with_fallback(prompt_content):
@@ -54,7 +47,7 @@ def call_gemini_with_fallback(prompt_content):
 st.sidebar.title("📌 Menu Chức Năng")
 feature = st.sidebar.radio(
     "Chọn tính năng xử lý:",
-    ["🎙️ AI Nhận Diện Âm Thanh", "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)"]
+    ["🎙️ AI Nhận Diện Âm Thanh", "🖼️ Nhận Diện Hình Ảnh (Gemini Vision)"]
 )
 
 # ==========================================
@@ -103,16 +96,11 @@ if feature == "🎙️ AI Nhận Diện Âm Thanh":
                         st.error(f"Lỗi xử lý âm thanh: {e}")
 
 # ==========================================
-# TÍNH NĂNG 2: PHÂN TÍCH HÌNH ẢNH (AWS HOẶC GEMINI)
+# TÍNH NĂNG 2: PHÂN TÍCH HÌNH ẢNH (GEMINI VISION)
 # ==========================================
-elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
+elif feature == "🖼️ Nhận Diện Hình Ảnh (Gemini Vision)":
     st.title("🖼️ Phân Tích & Nhận Diện Hình Ảnh")
-    
-    vision_engine = st.radio(
-        "Chọn Engine xử lý ảnh:",
-        ["Amazon Web Services (AWS Rekognition)", "Google Cloud (Gemini Vision)"],
-        horizontal=True
-    )
+    st.caption("Sử dụng Gemini Vision phân tích trực tiếp hình ảnh.")
     
     uploaded_img = st.file_uploader("Tải lên Hình ảnh (JPG, PNG)", type=["jpg", "jpeg", "png"])
     
@@ -120,53 +108,20 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
         image = Image.open(uploaded_img)
         st.image(image, caption="Hình ảnh đã tải lên", use_container_width=True)
         
-        if vision_engine == "Amazon Web Services (AWS Rekognition)":
-            if st.button("🔍 Quét nhãn đơn giản với AWS"):
-                with st.spinner("AWS Rekognition đang quét nhãn..."):
+        if st.button("🔍 Phân tích ảnh với Gemini"):
+            if not GEMINI_API_KEYS:
+                st.error("Chưa cấu hình API Key trong Secrets!")
+            else:
+                with st.spinner("Gemini đang phân tích ảnh..."):
                     try:
-                        # Khởi tạo client chuẩn xác, không bị dính token thừa
-                        rek_client = boto3.client(
-                            'rekognition',
-                            aws_access_key_id=AWS_ACCESS_KEY_ID,
-                            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-                            region_name=AWS_DEFAULT_REGION
-                        )
+                        vision_prompt = """
+                        Hãy phân tích hình ảnh này theo cấu trúc ngắn gọn:
+                        - **Mô tả ngắn**: Liệt kê các đối tượng và chi tiết chính nổi bật trong ảnh.
+                        - **Kết luận**: Viết đúng 1 dòng tổng kết ngắn gọn nhất về bản chất/nội dung của hình ảnh này.
+                        """
                         
-                        buffer = io.BytesIO()
-                        image.save(buffer, format=image.format if image.format else "JPEG")
-                        img_bytes = buffer.getvalue()
-                        
-                        res = rek_client.detect_labels(
-                            Image={'Bytes': img_bytes},
-                            MaxLabels=10,
-                            MinConfidence=70
-                        )
-                        
-                        labels_list = [f"- **{l['Name']}**: {l['Confidence']:.2f}%" for l in res['Labels']]
-                        
-                        st.success("✅ Quét nhãn AWS thành công!")
-                        st.write("**Các đối tượng phát hiện được:**")
-                        for item in labels_list:
-                            st.markdown(item)
-                            
+                        result_text = call_gemini_with_fallback([vision_prompt, image])
+                        st.success("✅ Phân tích xong!")
+                        st.markdown(result_text)
                     except Exception as e:
-                        st.error(f"Lỗi AWS Rekognition: {e}")
-                            
-        else:
-            if st.button("🔍 Phân tích chi tiết với Gemini"):
-                if not GEMINI_API_KEYS:
-                    st.error("Chưa cấu hình API Key trong Secrets!")
-                else:
-                    with st.spinner("Gemini đang phân tích ảnh..."):
-                        try:
-                            vision_prompt = """
-                            Hãy phân tích hình ảnh này theo cấu trúc ngắn gọn:
-                            - **Mô tả ngắn**: Liệt kê các đối tượng và chi tiết chính nổi bật trong ảnh.
-                            - **Kết luận**: Viết đúng 1 dòng tổng kết ngắn gọn nhất về bản chất/nội dung của hình ảnh này.
-                            """
-                            
-                            result_text = call_gemini_with_fallback([vision_prompt, image])
-                            st.success("✅ Phân tích xong!")
-                            st.markdown(result_text)
-                        except Exception as e:
-                            st.error(f"Lỗi Gemini Vision: {e}")
+                        st.error(f"Lỗi phân tích ảnh: {e}")
