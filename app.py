@@ -1,39 +1,36 @@
 import io
 import tempfile
-import boto3
 import streamlit as st
 import speech_recognition as sr
 from pydub import AudioSegment
 from PIL import Image
 from google import genai
 
+# Cấu hình giao diện trang web
 st.set_page_config(page_title="AI Multi-Tool", layout="centered")
-st.title("🤖 Ứng Dụng AI - Nhận Diện Hình Ảnh & Bóc Băng")
+st.title("🤖 Ứng Dụng AI - Phân Tích Hình Ảnh & Âm Thanh")
 
-# Lấy Keys từ Secrets
-aws_access_key = st.secrets.get("AWS_ACCESS_KEY_ID")
-aws_secret_key = st.secrets.get("AWS_SECRET_ACCESS_KEY")
-region = "us-east-1"
+# Lấy Gemini API Key từ Secrets
 gemini_api_key = st.secrets.get("GEMINI_API_KEY")
 
+# Menu chọn tính năng gọn gàng với 2 lựa chọn
 option = st.sidebar.selectbox(
-    "Chọn tính năng AI",
+    "Select AI Feature / Chọn tính năng",
     [
-        "1. Phân Tích Hình Ảnh Đa Năng (Gemini Vision)",
-        "2. Bóc Băng Audio/Video (Speech Recognition)",
-        "3. Nhận diện Cơ bản (AWS Rekognition)",
+        "1. Phân Tích Hình Ảnh Toàn Diện (Vision AI)",
+        "2. Bóc Băng Âm Thanh & Video (Audio AI)",
     ],
 )
 
-# ---------------------------------------------------------
-# TÍNH NĂNG 1: PHÂN TÍCH HÌNH ẢNH ĐA NĂNG (GEMINI VISION)
-# ---------------------------------------------------------
-if option == "1. Phân Tích Hình Ảnh Đa Năng (Gemini Vision)":
-    st.header("🖼️ Phân Tích Bất Kỳ Bức Ảnh Nào")
-    st.write("Tải lên ảnh bầu trời, con người, đồ vật, phong cảnh, bài tập... AI sẽ phân tích chi tiết bằng Tiếng Việt.")
+# =========================================================
+# TÍNH NĂNG 1: PHÂN TÍCH HÌNH ẢNH TOÀN DIỆN
+# =========================================================
+if option == "1. Phân Tích Hình Ảnh Toàn Diện (Vision AI)":
+    st.header("🖼️ Phân Tích & Nhận Diện Hình Ảnh")
+    st.write("Hệ thống tự động nhận diện loại ảnh (Bài tập/Toán học, Phong cảnh, Con người, Đồ vật, Văn bản...) và phân tích chi tiết.")
 
     uploaded_file = st.file_uploader(
-        "Chọn ảnh bất kỳ để phân tích", type=["jpg", "jpeg", "png", "webp"]
+        "Tải lên ảnh bất kỳ (JPG, PNG, WEBP)", type=["jpg", "jpeg", "png", "webp"]
     )
 
     if uploaded_file:
@@ -41,45 +38,51 @@ if option == "1. Phân Tích Hình Ảnh Đa Năng (Gemini Vision)":
         st.image(image, caption="Ảnh đã tải lên", use_container_width=True)
 
         user_prompt = st.text_input(
-            "Yêu cầu riêng cho AI (Tùy chọn):",
-            placeholder="Ví dụ: Bầu trời này thời tiết ra sao? Hoặc: Đồ vật này dùng làm gì?"
+            "Câu hỏi hoặc yêu cầu thêm (Tùy chọn):",
+            placeholder="Ví dụ: Giải bài toán này giúp tôi? Hoặc: Địa điểm này ở đâu?"
         )
 
-        if st.button("🚀 Bắt đầu phân tích toàn diện"):
+        if st.button("🚀 Bắt đầu phân tích"):
             if not gemini_api_key:
                 st.error("Chưa cấu hình GEMINI_API_KEY trong Streamlit Secrets!")
             else:
                 try:
-                    with st.spinner("AI đang quan sát và phân tích toàn bộ bức ảnh..."):
+                    with st.spinner("AI đang quan sát và phân tích bức ảnh..."):
                         client = genai.Client(api_key=gemini_api_key.strip())
 
+                        # Prompt thông minh tự điều chỉnh theo thể loại ảnh
                         default_prompt = (
-                            "Hãy quan sát kỹ bức ảnh này và phân tích thật chi tiết bằng Tiếng Việt theo các mục sau:\n"
-                            "1. **Chủ đề chính & Tổng quan:** Bức ảnh chụp gì? (Bầu trời, con người, đồ vật, phong cảnh, bài tập hình học...)\n"
-                            "2. **Phân tích con người (nếu có):** Số lượng, độ tuổi ước tính, cảm xúc, hành động, trang phục.\n"
-                            "3. **Phân tích đối tượng / Đồ vật / Bầu trời / Hình vẽ:** Chi tiết các đối tượng xuất hiện, thời tiết/bầu trời (nếu có), ký hiệu hình học hoặc công dụng đồ vật.\n"
-                            "4. **Nhận xét & Ngữ cảnh:** Môi trường xung quanh, giải thích nội dung hoặc ngữ cảnh của bức ảnh."
+                            "Hãy quan sát kỹ bức ảnh này và phân tích chi tiết bằng Tiếng Việt theo cấu trúc sau:\n\n"
+                            "1. **Phân loại & Tổng quan:** Xác định thể loại bức ảnh (Ví dụ: Bài tập/Toán học, Phong cảnh/Bầu trời, Con người, Đồ vật/Thiết bị, Văn bản/Giấy tờ, Nghệ thuật...).\n"
+                            "2. **Phân tích chi tiết theo thể loại:**\n"
+                            "   - Nếu là **Bài tập/Toán học/Hình vẽ**: Đọc các dữ kiện, công thức, góc, hình vẽ và đưa ra lời giải hoặc hướng giải.\n"
+                            "   - Nếu là **Phong cảnh/Bầu trời/Môi trường**: Phân tích thời tiết, ánh sáng, địa điểm, các yếu tố tự nhiên.\n"
+                            "   - Nếu là **Con người**: Mô tả số lượng, hành động, cảm xúc, biểu cảm, trang phục, ngữ cảnh.\n"
+                            "   - Nếu là **Đồ vật/Công nghệ**: Nhận diện tên đồ vật, tình trạng, công dụng và đặc điểm nổi bật.\n"
+                            "   - Nếu chứa **Văn bản/Chữ viết**: Trích xuất nội dung chữ trong ảnh.\n"
+                            "3. **Tóm tắt & Nhận xét:** Kết luận ngắn gọn về ý nghĩa hoặc thông điệp của bức ảnh."
                         )
 
                         prompt_to_use = user_prompt if user_prompt.strip() else default_prompt
 
                         response = client.models.generate_content(
-                            model="gemini-3.6-flash",
+                            model="gemini-2.5-flash",
                             contents=[image, prompt_to_use]
                         )
 
                         st.success("Phân tích hoàn tất!")
-                        st.markdown("### 📊 Kết quả phân tích từ AI:")
+                        st.markdown("### 📊 Kết quả từ AI:")
                         st.write(response.text)
 
                 except Exception as e:
                     st.error(f"Lỗi phân tích hình ảnh: {e}")
 
-# ---------------------------------------------------------
-# TÍNH NĂNG 2: BÓC BẰNG AUDIO / VIDEO
-# ---------------------------------------------------------
-elif option == "2. Bóc Băng Audio/Video (Speech Recognition)":
-    st.header("🎙️ Bóc Băng Âm Thanh / Video")
+# =========================================================
+# TÍNH NĂNG 2: BÓC BẰNG ÂM THANH & VIDEO
+# =========================================================
+elif option == "2. Bóc Băng Âm Thanh & Video (Audio AI)":
+    st.header("🎙️ Bóc Băng & Chuyển Âm Thanh Thành Văn Bản")
+    st.write("Tải lên file ghi âm hoặc video để trích xuất văn bản.")
 
     uploaded_file = st.file_uploader(
         "Tải lên file Audio hoặc Video",
@@ -94,9 +97,9 @@ elif option == "2. Bóc Băng Audio/Video (Speech Recognition)":
         else:
             st.video(uploaded_file)
 
-        if st.button("Bắt đầu bóc băng"):
+        if st.button("🚀 Bắt đầu bóc băng"):
             try:
-                with st.spinner("Đang xử lý âm thanh..."):
+                with st.spinner("Đang chuyển đổi và nhận diện giọng nói..."):
                     with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp_file:
                         tmp_file.write(uploaded_file.read())
                         tmp_path = tmp_file.name
@@ -108,55 +111,17 @@ elif option == "2. Bóc Băng Audio/Video (Speech Recognition)":
                     recognizer = sr.Recognizer()
                     with sr.AudioFile(wav_path) as source:
                         audio_data = recognizer.record(source)
-                        text_output = recognizer.recognize_google(audio_data, language="en-US")
+                        text_output = recognizer.recognize_google(audio_data, language="vi-VN")
 
                 st.success("Xử lý hoàn tất!")
-                st.subheader("📝 Văn bản trích xuất nguyên bản:")
+                st.subheader("📝 Văn bản trích xuất:")
                 if text_output:
                     st.write(text_output)
                     st.divider()
                     word_count = len(text_output.split())
                     st.write(f"• **Tổng số từ:** {word_count} từ")
                 else:
-                    st.write("Không nhận diện được âm thanh.")
+                    st.write("Không nhận diện được giọng nói trong file.")
 
             except Exception as e:
-                st.error(f"Lỗi bóc băng: {e}")
-
-# ---------------------------------------------------------
-# TÍNH NĂNG 3: NHẬN DIỆN CƠ BẢN (AWS REKOGNITION)
-# ---------------------------------------------------------
-elif option == "3. Nhận diện Cơ bản (AWS Rekognition)":
-    st.header("🖼️ Phân Tích Nhãn Bằng AWS Rekognition")
-    uploaded_file = st.file_uploader("Chọn ảnh", type=["jpg", "jpeg", "png"])
-
-    if uploaded_file:
-        image = Image.open(uploaded_file)
-        st.image(image, caption="Ảnh đã tải lên", use_container_width=True)
-
-        img_byte_arr = io.BytesIO()
-        image.save(img_byte_arr, format=image.format if image.format else "JPEG")
-        img_bytes = img_byte_arr.getvalue()
-
-        if st.button("Phân tích AWS"):
-            if not aws_access_key or not aws_secret_key:
-                st.error("Chưa cấu hình AWS Keys!")
-            else:
-                try:
-                    client = boto3.client(
-                        "rekognition",
-                        aws_access_key_id=aws_access_key,
-                        aws_secret_access_key=aws_secret_key,
-                        region_name=region,
-                    )
-                    response_labels = client.detect_labels(
-                        Image={"Bytes": img_bytes},
-                        MaxLabels=10,
-                        MinConfidence=60,
-                    )
-                    st.subheader("📌 Vật thể & Nhãn phát hiện:")
-                    for label in response_labels.get("Labels", []):
-                        st.write(f"• **{label['Name']}**: {label['Confidence']:.1f}%")
-
-                except Exception as e:
-                    st.error(f"Lỗi AWS: {e}")
+                st.error(f"Lỗi xử lý file âm thanh: {e}")
