@@ -38,7 +38,7 @@ feature = st.sidebar.radio(
 # ==========================================
 if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
     st.title("🎙️ Bóc Băng & Phân Tích Ngữ Cảnh Âm Thanh")
-    st.caption("Liệt kê nội dung audio, bản dịch Tiếng Việt và tổng kết mục đích cụ thể của cuộc trò chuyện.")
+    st.caption("Liệt kê lời thoại, bản dịch Tiếng Việt và tổng kết ngắn gọn mục đích cuộc trò chuyện.")
 
     uploaded_audio = st.file_uploader("Tải lên file Audio (MP3, WAV, M4A)", type=["mp3", "wav", "m4a"])
 
@@ -57,18 +57,20 @@ if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
                         
                         model = genai.GenerativeModel(GEMINI_MODEL_NAME)
                         
-                        # Prompt tinh chỉnh theo đúng yêu cầu: không đánh số 1234, tập trung vào bản chép + bản dịch + mục đích
+                        # Prompt rút gọn tối đa phần mục đích chính, không lan man
                         prompt = """
-                        Hãy phân tích file âm thanh này và trình bày kết quả theo cấu trúc sau:
+                        Hãy phân tích file âm thanh này và trình bày theo cấu trúc:
 
                         ### 📝 NỘI DUNG LỜI THOẠI (TRANSCRIPTION):
-                        (Liệt kê lại toàn bộ các câu thoại bằng ngôn ngữ gốc trong audio, KHÔNG sử dụng đánh số thứ tự 1, 2, 3...)
+                        (Liệt kê toàn bộ câu thoại bằng ngôn ngữ gốc, KHÔNG dùng đánh số 1, 2, 3...)
 
                         ### 🌐 BẢN DỊCH TIẾNG VIỆT:
-                        (Dịch lại toàn bộ nội dung lời thoại trên sang Tiếng Việt một cách tự nhiên và chính xác)
+                        (Dịch lại toàn bộ nội dung lời thoại sang Tiếng Việt)
 
                         ### 🎯 MỤC ĐÍCH CỤ THỂ CỦA CUỘC TRÒ CHUYỆN:
-                        (Phân tích và nêu rõ: Cuộc trò chuyện này nhằm mục đích gì? Bối cảnh diễn ra là gì? Ý định/thái độ chính của những người tham gia giao tiếp là gì?)
+                        - **Mục đích chính**: (Nói siêu ngắn gọn trong 1 câu: Cuộc trò chuyện này dùng để làm gì? Ví dụ: Đưa ra lời đề xuất, rủ rê và thể hiện sự đồng ý với kế hoạch). KHÔNG dùng các câu dẫn rườm rà như "File âm thanh tập hợp các mẫu câu...".
+                        - **Bối cảnh diễn ra**: (1 câu về môi trường/đối tượng trò chuyện).
+                        - **Ý định & Thái độ**: (Liệt kê ngắn gọn thái độ của người nói).
                         """
                         
                         response = model.generate_content([
@@ -99,7 +101,6 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
         image = Image.open(uploaded_img)
         st.image(image, caption="Hình ảnh đã tải lên", use_container_width=True)
         
-        # Nhánh AWS Rekognition
         if vision_engine == "Amazon Web Services (AWS Rekognition)":
             if st.button("🔍 Phân tích Nhãn với AWS"):
                 if not (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY):
@@ -131,7 +132,6 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                         except Exception as e:
                             st.error(f"Lỗi AWS Rekognition: {e}")
                             
-        # Nhánh Gemini AI Flash
         else:
             if st.button("🔍 Mô tả ảnh với Gemini"):
                 if not GEMINI_API_KEY:
