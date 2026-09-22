@@ -21,6 +21,9 @@ AWS_DEFAULT_REGION = st.secrets.get("AWS_DEFAULT_REGION", "us-east-1")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
+# Tên model Gemini Flash chuẩn mới nhất
+GEMINI_MODEL_NAME = "gemini-2.5-flash"
+
 # ==========================================
 # SIDEBAR DI CHUYỂN
 # ==========================================
@@ -31,7 +34,7 @@ feature = st.sidebar.radio(
 )
 
 # ==========================================
-# TÍNH NĂNG 1: BÓC BĂNG ÂM THANH (DÙNG GEMINI)
+# TÍNH NĂNG 1: BÓC BĂNG ÂM THANH (GEMINI FLASH)
 # ==========================================
 if feature == "🎙️ Bóc Băng Âm Thanh (Gemini AI)":
     st.title("🎙️ Bóc Băng Âm Thanh / Video")
@@ -46,14 +49,14 @@ if feature == "🎙️ Bóc Băng Âm Thanh (Gemini AI)":
             if not GEMINI_API_KEY:
                 st.error("Chưa cấu hình GEMINI_API_KEY trong Secrets!")
             else:
-                with st.spinner("Gemini đang lắng nghe và trích xuất lời nói..."):
+                with st.spinner("Gemini Flash đang lắng nghe và trích xuất lời nói..."):
                     try:
                         audio_bytes = uploaded_audio.read()
                         file_ext = uploaded_audio.name.split(".")[-1].lower()
                         mime_type = f"audio/{file_ext}" if file_ext != "mp3" else "audio/mpeg"
                         
-                        # Sử dụng Gemini Flash (tự động điều hướng bản Flash mới nhất)
-                        model = genai.GenerativeModel("gemini-1.5-flash")
+                        # Khởi tạo model Gemini Flash mới
+                        model = genai.GenerativeModel(GEMINI_MODEL_NAME)
                         
                         response = model.generate_content([
                             "Hãy chép lại chính xác toàn bộ nội dung lời nói trong file âm thanh này sang văn bản tiếng Việt.",
@@ -66,7 +69,7 @@ if feature == "🎙️ Bóc Băng Âm Thanh (Gemini AI)":
                         st.error(f"Lỗi xử lý âm thanh: {e}")
 
 # ==========================================
-# TÍNH NĂNG 2: PHÂN TÍCH HÌNH ẢNH (AWS REKOGNITION)
+# TÍNH NĂNG 2: PHÂN TÍCH HÌNH ẢNH (AWS REKOGNITION / GEMINI)
 # ==========================================
 elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
     st.title("🖼️ Phân Tích & Nhận Diện Hình Ảnh")
@@ -115,15 +118,15 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                         except Exception as e:
                             st.error(f"Lỗi AWS Rekognition: {e}")
                             
-        # Nhánh Gemini AI
+        # Nhánh Gemini AI Flash
         else:
             if st.button("🔍 Mô tả ảnh với Gemini"):
                 if not GEMINI_API_KEY:
                     st.error("Chưa cấu hình GEMINI_API_KEY trong Secrets!")
                 else:
-                    with st.spinner("Gemini đang xem ảnh..."):
+                    with st.spinner("Gemini Flash đang xem ảnh..."):
                         try:
-                            model = genai.GenerativeModel("gemini-1.5-flash")
+                            model = genai.GenerativeModel(GEMINI_MODEL_NAME)
                             response = model.generate_content([
                                 "Hãy mô tả chi tiết các đối tượng và bối cảnh trong hình ảnh này bằng tiếng Việt.",
                                 image
