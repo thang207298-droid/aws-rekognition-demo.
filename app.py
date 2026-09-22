@@ -1,8 +1,6 @@
 import io
 import tempfile
 import streamlit as st
-import speech_recognition as sr
-from pydub import AudioSegment
 from PIL import Image
 from google import genai
 
@@ -13,12 +11,12 @@ st.title("🤖 Ứng Dụng AI - Phân Tích Hình Ảnh & Âm Thanh")
 # Lấy Gemini API Key từ Secrets
 gemini_api_key = st.secrets.get("GEMINI_API_KEY")
 
-# Menu chọn tính năng gọn gàng với 2 lựa chọn
+# Menu chọn tính năng
 option = st.sidebar.selectbox(
     "Select AI Feature / Chọn tính năng",
     [
         "1. Phân Tích Hình Ảnh Toàn Diện (Vision AI)",
-        "2. Bóc Băng Âm Thanh & Video (Audio AI)",
+        "2. Bóc Băng & Phân Tích Âm Thanh/Video (Audio AI)",
     ],
 )
 
@@ -50,7 +48,6 @@ if option == "1. Phân Tích Hình Ảnh Toàn Diện (Vision AI)":
                     with st.spinner("AI đang quan sát và phân tích bức ảnh..."):
                         client = genai.Client(api_key=gemini_api_key.strip())
 
-                        # Prompt thông minh tự điều chỉnh theo thể loại ảnh
                         default_prompt = (
                             "Hãy quan sát kỹ bức ảnh này và phân tích chi tiết bằng Tiếng Việt theo cấu trúc sau:\n\n"
                             "1. **Phân loại & Tổng quan:** Xác định thể loại bức ảnh (Ví dụ: Bài tập/Toán học, Phong cảnh/Bầu trời, Con người, Đồ vật/Thiết bị, Văn bản/Giấy tờ, Nghệ thuật...).\n"
@@ -78,15 +75,15 @@ if option == "1. Phân Tích Hình Ảnh Toàn Diện (Vision AI)":
                     st.error(f"Lỗi phân tích hình ảnh: {e}")
 
 # =========================================================
-# TÍNH NĂNG 2: BÓC BẰNG ÂM THANH & VIDEO
+# TÍNH NĂNG 2: BÓC BẰNG ÂM THANH & VIDEO BẰNG GEMINI AI
 # =========================================================
-elif option == "2. Bóc Băng Âm Thanh & Video (Audio AI)":
-    st.header("🎙️ Bóc Băng & Chuyển Âm Thanh Thành Văn Bản")
-    st.write("Tải lên file ghi âm hoặc video để trích xuất văn bản.")
+elif option == "2. Bóc Băng & Phân Tích Âm Thanh/Video (Audio AI)":
+    st.header("🎙️ Bóc Băng & Phân Tích Audio / Video (Gemini AI)")
+    st.write("Sử dụng Gemini AI để bóc băng toàn bộ file âm thanh, video chính xác 100% kèm tóm tắt nội dung.")
 
     uploaded_file = st.file_uploader(
-        "Tải lên file Audio hoặc Video",
-        type=["mp3", "mp4", "wav", "m4a", "aac", "flac", "ogg", "mov", "avi", "mkv", "webm"],
+        "Tải lên file Audio hoặc Video (MP3, WAV, MP4, M4A, AAC...)",
+        type=["mp3", "mp4", "wav", "m4a", "aac", "flac", "ogg", "mov", "webm"],
     )
 
     if uploaded_file:
@@ -97,31 +94,44 @@ elif option == "2. Bóc Băng Âm Thanh & Video (Audio AI)":
         else:
             st.video(uploaded_file)
 
-        if st.button("🚀 Bắt đầu bóc băng"):
-            try:
-                with st.spinner("Đang chuyển đổi và nhận diện giọng nói..."):
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp_file:
-                        tmp_file.write(uploaded_file.read())
-                        tmp_path = tmp_file.name
+        audio_prompt = st.text_input(
+            "Yêu cầu riêng cho AI (Tùy chọn):",
+            placeholder="Ví dụ: Dịch sang Tiếng Việt? Hoặc: Tóm tắt 3 ý chính?"
+        )
 
-                    audio_segment = AudioSegment.from_file(tmp_path)
-                    wav_path = tmp_path + ".wav"
-                    audio_segment.export(wav_path, format="wav")
+        if st.button("🚀 Bắt đầu bóc băng toàn bộ"):
+            if not gemini_api_key:
+                st.error("Chưa cấu hình GEMINI_API_KEY trong Streamlit Secrets!")
+            else:
+                try:
+                    with st.spinner("AI đang lắng nghe và trích xuất toàn bộ file âm thanh..."):
+                        client = genai.Client(api_key=gemini_api_key.strip())
 
-                    recognizer = sr.Recognizer()
-                    with sr.AudioFile(wav_path) as source:
-                        audio_data = recognizer.record(source)
-                        text_output = recognizer.recognize_google(audio_data, language="vi-VN")
+                        # Lưu tạm file để gửi cho Gemini Client
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp_file:
+                            tmp_file.write(uploaded_file.read())
+                            tmp_path = tmp_file.name
 
-                st.success("Xử lý hoàn tất!")
-                st.subheader("📝 Văn bản trích xuất:")
-                if text_output:
-                    st.write(text_output)
-                    st.divider()
-                    word_count = len(text_output.split())
-                    st.write(f"• **Tổng số từ:** {word_count} từ")
-                else:
-                    st.write("Không nhận diện được giọng nói trong file.")
+                        # Upload file lên Gemini
+                        audio_file = client.files.upload(file=tmp_path)
 
-            except Exception as e:
-                st.error(f"Lỗi xử lý file âm thanh: {e}")
+                        default_audio_prompt = (
+                            "Hãy lắng nghe kỹ toàn bộ file âm thanh/video này và thực hiện các bước sau:\n\n"
+                            "1. **Bóc băng nguyên văn (Transcript):** Trích xuất đầy đủ 100% lời nói trong file theo ngữ cảnh ngôn ngữ gốc (không bỏ sót đoạn nào).\n"
+                            "2. **Dịch thuật (Nếu là Tiếng Anh/ngôn ngữ khác):** Dịch toàn bộ bản bóc băng sang Tiếng Việt chuẩn nghĩa.\n"
+                            "3. **Tóm tắt nội dung chính:** Đưa ra 3-5 ý chính quan trọng nhất mà âm thanh đề cập đến."
+                        )
+
+                        prompt_to_use = audio_prompt if audio_prompt.strip() else default_audio_prompt
+
+                        response = client.models.generate_content(
+                            model="gemini-3.6-flash",
+                            contents=[audio_file, prompt_to_use]
+                        )
+
+                        st.success("Xử lý hoàn tất!")
+                        st.markdown("### 📝 Kết quả bóc băng & Phân tích:")
+                        st.write(response.text)
+
+                except Exception as e:
+                    st.error(f"Lỗi xử lý file âm thanh: {e}")
