@@ -21,7 +21,6 @@ AWS_DEFAULT_REGION = st.secrets.get("AWS_DEFAULT_REGION", "us-east-1")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# Sử dụng model Gemini 3.6 Flash
 GEMINI_MODEL_NAME = "gemini-3.6-flash"
 
 # ==========================================
@@ -37,8 +36,8 @@ feature = st.sidebar.radio(
 # TÍNH NĂNG 1: BÓC BĂNG & PHÂN TÍCH ÂM THANH
 # ==========================================
 if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
-    st.title("🎙️ Bóc Băng & Phân Tích Ngữ Cảnh Âm Thanh")
-    st.caption("Liệt kê lời thoại, bản dịch Tiếng Việt và tổng kết ngắn gọn mục đích cuộc trò chuyện.")
+    st.title("🎙️ Bóc Băng & Phân Tích Âm Thanh")
+    st.caption("Chép lời, dịch tiếng Việt và đúc kết 1 dòng mục đích ngắn gọn.")
 
     uploaded_audio = st.file_uploader("Tải lên file Audio (MP3, WAV, M4A)", type=["mp3", "wav", "m4a"])
 
@@ -49,7 +48,7 @@ if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
             if not GEMINI_API_KEY:
                 st.error("Chưa cấu hình GEMINI_API_KEY trong Secrets!")
             else:
-                with st.spinner("Gemini 3.6 Flash đang phân tích âm thanh..."):
+                with st.spinner("Gemini 3.6 Flash đang phân tích..."):
                     try:
                         audio_bytes = uploaded_audio.read()
                         file_ext = uploaded_audio.name.split(".")[-1].lower()
@@ -57,20 +56,17 @@ if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
                         
                         model = genai.GenerativeModel(GEMINI_MODEL_NAME)
                         
-                        # Prompt rút gọn tối đa phần mục đích chính, không lan man
                         prompt = """
-                        Hãy phân tích file âm thanh này và trình bày theo cấu trúc:
+                        Hãy phân tích file âm thanh này theo cấu trúc ngắn gọn sau:
 
-                        ### 📝 NỘI DUNG LỜI THOẠI (TRANSCRIPTION):
-                        (Liệt kê toàn bộ câu thoại bằng ngôn ngữ gốc, KHÔNG dùng đánh số 1, 2, 3...)
+                        ### 📝 NỘI DUNG LỜI THOẠI:
+                        (Liệt kê các câu thoại gốc, không đánh số thứ tự)
 
                         ### 🌐 BẢN DỊCH TIẾNG VIỆT:
-                        (Dịch lại toàn bộ nội dung lời thoại sang Tiếng Việt)
+                        (Dịch nghĩa tiếng Việt tương ứng)
 
-                        ### 🎯 MỤC ĐÍCH CỤ THỂ CỦA CUỘC TRÒ CHUYỆN:
-                        - **Mục đích chính**: (Nói siêu ngắn gọn trong 1 câu: Cuộc trò chuyện này dùng để làm gì? Ví dụ: Đưa ra lời đề xuất, rủ rê và thể hiện sự đồng ý với kế hoạch). KHÔNG dùng các câu dẫn rườm rà như "File âm thanh tập hợp các mẫu câu...".
-                        - **Bối cảnh diễn ra**: (1 câu về môi trường/đối tượng trò chuyện).
-                        - **Ý định & Thái độ**: (Liệt kê ngắn gọn thái độ của người nói).
+                        ### 🎯 MỤC ĐÍCH:
+                        (Chỉ viết ĐÚNG 1 DÒNG kết luận chung ngắn gọn nhất về mục đích của đoạn hội thoại này).
                         """
                         
                         response = model.generate_content([
@@ -140,11 +136,19 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                     with st.spinner("Gemini 3.6 Flash đang xem ảnh..."):
                         try:
                             model = genai.GenerativeModel(GEMINI_MODEL_NAME)
+                            
+                            # Prompt đã rút gọn, đi thẳng vào ý chính và có 1 dòng kết luận chung
+                            vision_prompt = """
+                            Hãy phân tích hình ảnh này theo cấu trúc ngắn gọn:
+                            - **Mô tả ngắn**: Liệt kê các đối tượng và chi tiết chính nổi bật trong ảnh.
+                            - **Kết luận**: Viết đúng 1 dòng tổng kết ngắn gọn nhất về bản chất/nội dung của hình ảnh này.
+                            """
+                            
                             response = model.generate_content([
-                                "Hãy mô tả chi tiết các đối tượng, hành động và bối cảnh trong hình ảnh này bằng tiếng Việt.",
+                                vision_prompt,
                                 image
                             ])
                             st.success("✅ Phân tích xong!")
-                            st.write(response.text)
+                            st.markdown(response.text)
                         except Exception as e:
                             st.error(f"Lỗi Gemini Vision: {e}")
