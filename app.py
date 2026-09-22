@@ -16,7 +16,6 @@ st.set_page_config(
 # Đọc danh sách các API Key từ secrets.toml
 GEMINI_API_KEYS = st.secrets.get("GEMINI_API_KEYS", [])
 if not GEMINI_API_KEYS:
-    # Fallback nếu bạn chỉ lỡ lưu 1 key kiểu cũ
     single_key = st.secrets.get("GEMINI_API_KEY", "")
     GEMINI_API_KEYS = [single_key] if single_key else []
 
@@ -32,22 +31,18 @@ def call_gemini_with_fallback(prompt_content):
         raise Exception("Chưa cấu hình bất kỳ GEMINI_API_KEYS nào trong secrets.toml!")
     
     last_exception = None
-    # Duyệt qua từng key trong danh sách (Key chính trước, đến các key dự phòng)
     for idx, key in enumerate(GEMINI_API_KEYS):
         try:
             genai.configure(api_key=key)
             model = genai.GenerativeModel(GEMINI_MODEL_NAME)
             response = model.generate_content(prompt_content)
-            return response.text # Thành công thì trả về kết quả luôn
+            return response.text 
         except Exception as e:
             last_exception = e
             error_str = str(e)
-            # Nếu gặp lỗi 429 (hết quota), in cảnh báo và thử sang key tiếp theo
             if "429" in error_str or "quota" in error_str.lower():
-                st.warning(f"⚠️ Key số {idx + 1} đã hết hạn mức (429). Đang tự động chuyển sang key dự phòng...")
-                continue
+                continue # Tự động chuyển ngầm sang key tiếp theo mà không hiện dòng chữ dài dòng
             else:
-                # Nếu là lỗi khác (không phải do quota) thì ném lỗi luôn
                 raise e
                 
     raise Exception(f"Tất cả các API Key đều đã cạn kiệt hạn mức hoặc gặp lỗi: {last_exception}")
@@ -58,14 +53,14 @@ def call_gemini_with_fallback(prompt_content):
 st.sidebar.title("📌 Menu Chức Năng")
 feature = st.sidebar.radio(
     "Chọn tính năng xử lý:",
-    ["🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)", "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)"]
+    ["🎙️ AI Nhận Diện Âm Thanh", "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)"]
 )
 
 # ==========================================
-# TÍNH NĂNG 1: BÓC BĂNG & PHÂN TÍCH ÂM THANH
+# TÍNH NĂNG 1: AI NHẬN DIỆN ÂM THANH
 # ==========================================
-if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
-    st.title("🎙️ Bóc Băng & Phân Tích Âm Thanh")
+if feature == "🎙️ AI Nhận Diện Âm Thanh":
+    st.title("🎙️ AI Nhận Diện Âm Thanh")
     st.caption("Chép lời, dịch tiếng Việt và đúc kết 1 dòng mục đích ngắn gọn.")
 
     uploaded_audio = st.file_uploader("Tải lên file Audio (MP3, WAV, M4A)", type=["mp3", "wav", "m4a"])
@@ -77,7 +72,7 @@ if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
             if not GEMINI_API_KEYS:
                 st.error("Chưa cấu hình API Key trong Secrets!")
             else:
-                with st.spinner("Đang phân tích âm thanh (tự động kiểm tra key dự phòng)..."):
+                with st.spinner("Đang xử lý âm thanh..."):
                     try:
                         audio_bytes = uploaded_audio.read()
                         file_ext = uploaded_audio.name.split(".")[-1].lower()
@@ -96,7 +91,6 @@ if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
                         (Chỉ viết ĐÚNG 1 DÒNG kết luận chung ngắn gọn nhất về mục đích của đoạn hội thoại này).
                         """
                         
-                        # Gọi hàm bọc có sẵn cơ chế fallback dự phòng key
                         result_text = call_gemini_with_fallback([
                             prompt,
                             {"mime_type": mime_type, "data": audio_bytes}
@@ -125,7 +119,6 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
         image = Image.open(uploaded_img)
         st.image(image, caption="Hình ảnh đã tải lên", use_container_width=True)
         
-        # Nhánh AWS Rekognition + Gemini tóm tắt
         if vision_engine == "Amazon Web Services (AWS Rekognition)":
             if st.button("🔍 Phân tích Nhãn & Kết luận với AWS"):
                 if not (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY):
@@ -158,7 +151,7 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                             st.markdown(labels_text)
                             
                             if GEMINI_API_KEYS:
-                                with st.spinner("Đang tổng hợp kết luận bằng Gemini (có dùng key dự phòng)..."):
+                                with st.spinner("Đang tổng hợp kết luận..."):
                                     summary_prompt = f"""
                                     Dựa vào các nhãn nhận diện được từ AWS Rekognition sau đây:
                                     {labels_text}
@@ -172,13 +165,12 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                         except Exception as e:
                             st.error(f"Lỗi AWS Rekognition: {e}")
                             
-        # Nhánh Gemini Vision
         else:
             if st.button("🔍 Mô tả ảnh với Gemini"):
                 if not GEMINI_API_KEYS:
                     st.error("Chưa cấu hình API Key trong Secrets!")
                 else:
-                    with st.spinner("Gemini đang xem ảnh (tự động kiểm tra key dự phòng)..."):
+                    with st.spinner("Gemini đang phân tích ảnh..."):
                         try:
                             vision_prompt = """
                             Hãy phân tích hình ảnh này theo cấu trúc ngắn gọn:
