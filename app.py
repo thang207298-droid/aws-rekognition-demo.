@@ -21,8 +21,8 @@ AWS_DEFAULT_REGION = st.secrets.get("AWS_DEFAULT_REGION", "us-east-1")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# Tên model Gemini Flash chuẩn mới nhất
-GEMINI_MODEL_NAME = "gemini-2.5-flash"
+# Đổi sang phiên bản gemini-3.6-flash chuẩn mới nhất theo yêu cầu từ API
+GEMINI_MODEL_NAME = "gemini-3.6-flash"
 
 # ==========================================
 # SIDEBAR DI CHUYỂN
@@ -49,13 +49,13 @@ if feature == "🎙️ Bóc Băng Âm Thanh (Gemini AI)":
             if not GEMINI_API_KEY:
                 st.error("Chưa cấu hình GEMINI_API_KEY trong Secrets!")
             else:
-                with st.spinner("Gemini Flash đang lắng nghe và trích xuất lời nói..."):
+                with st.spinner("Gemini 3.6 Flash đang lắng nghe và trích xuất lời nói..."):
                     try:
                         audio_bytes = uploaded_audio.read()
                         file_ext = uploaded_audio.name.split(".")[-1].lower()
                         mime_type = f"audio/{file_ext}" if file_ext != "mp3" else "audio/mpeg"
                         
-                        # Khởi tạo model Gemini Flash mới
+                        # Khởi tạo model Gemini 3.6 Flash
                         model = genai.GenerativeModel(GEMINI_MODEL_NAME)
                         
                         response = model.generate_content([
@@ -124,7 +124,7 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                 if not GEMINI_API_KEY:
                     st.error("Chưa cấu hình GEMINI_API_KEY trong Secrets!")
                 else:
-                    with st.spinner("Gemini Flash đang xem ảnh..."):
+                    with st.spinner("Gemini 3.6 Flash đang xem ảnh..."):
                         try:
                             model = genai.GenerativeModel(GEMINI_MODEL_NAME)
                             response = model.generate_content([
