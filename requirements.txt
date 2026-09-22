@@ -1,5 +1,4 @@
 streamlit
-pillow
-google-genai
 boto3
-requests
+google-generativeai
+pillow
