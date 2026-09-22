@@ -126,16 +126,16 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                 else:
                     with st.spinner("AWS Rekognition đang quét nhãn..."):
                         try:
-                            # Tự động loại bỏ khoảng trắng ẩn để trị dứt điểm lỗi lệch chữ ký
-                            clean_aws_id = AWS_ACCESS_KEY_ID.strip()
-                            clean_aws_secret = AWS_SECRET_ACCESS_KEY.strip()
-                            clean_aws_region = AWS_DEFAULT_REGION.strip()
+                            # Làm sạch chuỗi tuyệt đối để chống lỗi ký tự ẩn
+                            clean_id = AWS_ACCESS_KEY_ID.strip().strip('"').strip("'")
+                            clean_secret = AWS_SECRET_ACCESS_KEY.strip().strip('"').strip("'")
+                            clean_region = AWS_DEFAULT_REGION.strip().strip('"').strip("'")
                             
                             rek_client = boto3.client(
                                 'rekognition',
-                                aws_access_key_id=clean_aws_id,
-                                aws_secret_access_key=clean_aws_secret,
-                                region_name=clean_aws_region
+                                aws_access_key_id=clean_id,
+                                aws_secret_access_key=clean_secret,
+                                region_name=clean_region
                             )
                             
                             buffer = io.BytesIO()
@@ -169,6 +169,7 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                             
                         except Exception as e:
                             st.error(f"Lỗi AWS Rekognition: {e}")
+                            st.info("💡 Mẹo: Hãy kiểm tra lại cặp Access Key / Secret Key trên AWS Console xem đã bị đổi mới hoặc khóa chưa nhé!")
                             
         else:
             if st.button("🔍 Mô tả ảnh với Gemini"):
