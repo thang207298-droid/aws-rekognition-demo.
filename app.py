@@ -5,7 +5,7 @@ import io
 import google.generativeai as genai
 
 # ==========================================
-# CẤU HÌNH TRANG & SECRETS
+# CẤU HÌNH TRANG & SECRETS (GEMINI)
 # ==========================================
 st.set_page_config(
     page_title="AI Application - Vision & Audio",
@@ -13,18 +13,20 @@ st.set_page_config(
     layout="wide"
 )
 
-# Đọc danh sách các API Key từ secrets.toml
+# Đọc danh sách các API Key Gemini từ secrets.toml
 GEMINI_API_KEYS = st.secrets.get("GEMINI_API_KEYS", [])
 if not GEMINI_API_KEYS:
-    single_key = st.secrets.get("GEMINI_API_KEY", "")
+    single_key = st.secrets.get("GEMINI_KEY", "")
     GEMINI_API_KEYS = [single_key] if single_key else []
 
-# Lấy trực tiếp thông tin AWS chuẩn xác từ secrets.toml
-AWS_ACCESS_KEY_ID = st.secrets["AWS_ACCESS_KEY_ID"]
-AWS_SECRET_ACCESS_KEY = st.secrets["AWS_SECRET_ACCESS_KEY"]
-AWS_DEFAULT_REGION = st.secrets.get("AWS_DEFAULT_REGION", "us-east-1")
-
 GEMINI_MODEL_NAME = "gemini-3.6-flash"
+
+# ==========================================
+# HARDCODE TRỰC TIẾP CẶP AWS KEYS MỚI NHẤT
+# ==========================================
+AWS_ACCESS_KEY_ID = "AKIATNDZHVIUDDTTJLWK"
+AWS_SECRET_ACCESS_KEY = "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"
+AWS_DEFAULT_REGION = "us-east-1"
 
 # Hàm gọi Gemini tự động xoay vòng key khi gặp lỗi hết quota (429)
 def call_gemini_with_fallback(prompt_content):
@@ -124,7 +126,6 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
             if st.button("🔍 Phân tích Nhãn & Kết luận với AWS"):
                 with st.spinner("AWS Rekognition đang quét nhãn..."):
                     try:
-                        # Trở lại hoàn toàn cách gọi boto3 trực tiếp như lúc đầu chạy thành công
                         rek_client = boto3.client(
                             'rekognition',
                             aws_access_key_id=AWS_ACCESS_KEY_ID,
