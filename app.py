@@ -22,8 +22,8 @@ if not GEMINI_API_KEYS:
 GEMINI_MODEL_NAME = "gemini-3.6-flash"
 
 # Hardcode key AWS mới nhất để chạy trực tiếp không lỗi
-AWS_ACCESS_KEY_ID = "AKIATNDZHVIUDDTTJLWK"
-AWS_SECRET_ACCESS_KEY = "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"
+AWS_ACCESS_KEY_ID = "AKIATNDZHVIUCA46OPFG"
+AWS_SECRET_ACCESS_KEY = "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"
 AWS_DEFAULT_REGION = "us-east-1"
 
 # Hàm gọi Gemini tự động xoay vòng key khi hết quota (429)
