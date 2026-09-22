@@ -21,55 +21,63 @@ AWS_DEFAULT_REGION = st.secrets.get("AWS_DEFAULT_REGION", "us-east-1")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# Đổi sang phiên bản gemini-3.6-flash chuẩn mới nhất theo yêu cầu từ API
+# Sử dụng Gemini 3.6 Flash
 GEMINI_MODEL_NAME = "gemini-3.6-flash"
 
 # ==========================================
-# SIDEBAR DI CHUYỂN
+# SIDEBAR MENU
 # ==========================================
 st.sidebar.title("📌 Menu Chức Năng")
 feature = st.sidebar.radio(
     "Chọn tính năng xử lý:",
-    ["🎙️ Bóc Băng Âm Thanh (Gemini AI)", "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)"]
+    ["🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)", "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)"]
 )
 
 # ==========================================
-# TÍNH NĂNG 1: BÓC BĂNG ÂM THANH (GEMINI FLASH)
+# TÍNH NĂNG 1: BÓC BĂNG & PHÂN TÍCH ÂM THANH
 # ==========================================
-if feature == "🎙️ Bóc Băng Âm Thanh (Gemini AI)":
-    st.title("🎙️ Bóc Băng Âm Thanh / Video")
-    st.caption("Sử dụng mô hình Gemini Flash AI hỗ trợ nhận diện tiếng Việt cực chính xác.")
+if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
+    st.title("🎙️ Bóc Băng & Phân Tích Ngữ Cảnh Âm Thanh")
+    st.caption("Sử dụng Gemini 3.6 Flash để chép lời, dịch tiếng Việt và phân tích ngữ cảnh chi tiết.")
 
     uploaded_audio = st.file_uploader("Tải lên file Audio (MP3, WAV, M4A)", type=["mp3", "wav", "m4a"])
 
     if uploaded_audio is not None:
         st.audio(uploaded_audio)
         
-        if st.button("🚀 Bóc băng lời nói"):
+        if st.button("🚀 Bóc băng & Phân tích ngữ cảnh"):
             if not GEMINI_API_KEY:
                 st.error("Chưa cấu hình GEMINI_API_KEY trong Secrets!")
             else:
-                with st.spinner("Gemini 3.6 Flash đang lắng nghe và trích xuất lời nói..."):
+                with st.spinner("Gemini 3.6 Flash đang lắng nghe, chép lời và phân tích ngữ cảnh..."):
                     try:
                         audio_bytes = uploaded_audio.read()
                         file_ext = uploaded_audio.name.split(".")[-1].lower()
                         mime_type = f"audio/{file_ext}" if file_ext != "mp3" else "audio/mpeg"
                         
-                        # Khởi tạo model Gemini 3.6 Flash
                         model = genai.GenerativeModel(GEMINI_MODEL_NAME)
                         
+                        # Prompt phân tích sâu: Chép lời, dịch nghĩa & giải thích ngữ cảnh
+                        prompt = """
+                        Hãy xử lý file âm thanh này theo các yêu cầu sau:
+                        1. Chép lại chính xác toàn bộ lời nói bằng ngôn ngữ gốc (ví dụ: Tiếng Anh/Tiếng Việt).
+                        2. Dịch từng câu thoại sang tiếng Việt (đặt trong ngoặc đơn hoặc in nghiêng).
+                        3. Phân tích ngắn gọn ngữ cảnh, thái độ/ý định của người nói hoặc ý nghĩa của đoạn hội thoại.
+                        Format trình bày rõ ràng, dễ nhìn từng câu/đoạn.
+                        """
+                        
                         response = model.generate_content([
-                            "Hãy chép lại chính xác toàn bộ nội dung lời nói trong file âm thanh này sang văn bản tiếng Việt.",
+                            prompt,
                             {"mime_type": mime_type, "data": audio_bytes}
                         ])
                         
-                        st.success("✅ Bóc băng thành công!")
-                        st.text_area("Văn bản bóc băng:", value=response.text, height=250)
+                        st.success("✅ Phân tích âm thanh thành công!")
+                        st.markdown(response.text)
                     except Exception as e:
                         st.error(f"Lỗi xử lý âm thanh: {e}")
 
 # ==========================================
-# TÍNH NĂNG 2: PHÂN TÍCH HÌNH ẢNH (AWS REKOGNITION / GEMINI)
+# TÍNH NĂNG 2: PHÂN TÍCH HÌNH ẢNH
 # ==========================================
 elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
     st.title("🖼️ Phân Tích & Nhận Diện Hình Ảnh")
@@ -128,7 +136,7 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                         try:
                             model = genai.GenerativeModel(GEMINI_MODEL_NAME)
                             response = model.generate_content([
-                                "Hãy mô tả chi tiết các đối tượng và bối cảnh trong hình ảnh này bằng tiếng Việt.",
+                                "Hãy mô tả chi tiết các đối tượng, hành động và bối cảnh trong hình ảnh này bằng tiếng Việt.",
                                 image
                             ])
                             st.success("✅ Phân tích xong!")
