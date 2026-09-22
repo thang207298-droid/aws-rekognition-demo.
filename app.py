@@ -21,9 +21,9 @@ if not GEMINI_API_KEYS:
 
 GEMINI_MODEL_NAME = "gemini-3.6-flash"
 
-# Hardcode key AWS mới nhất để chạy trực tiếp không lỗi
+# Hardcode key AWS mới nhất để chạy trực tiếp
 AWS_ACCESS_KEY_ID = "AKIATNDZHVIUCA46OPFG"
-AWS_SECRET_ACCESS_KEY = "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"
+AWS_SECRET_ACCESS_KEY = "ĐIỀN_SECRET_KEY_CỦA_BẠN_VÀO_ĐÂY"  # Thay secret key tương ứng vào đây
 AWS_DEFAULT_REGION = "us-east-1"
 
 # Hàm gọi Gemini tự động xoay vòng key khi hết quota (429)
@@ -103,7 +103,7 @@ if feature == "🎙️ AI Nhận Diện Âm Thanh":
                         st.error(f"Lỗi xử lý âm thanh: {e}")
 
 # ==========================================
-# TÍNH NĂNG 2: PHÂN TÍCH HÌNH ẢNH (AWS HOẶC GEMINI GIỮ NGUYÊN)
+# TÍNH NĂNG 2: PHÂN TÍCH HÌNH ẢNH (AWS HOẶC GEMINI)
 # ==========================================
 elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
     st.title("🖼️ Phân Tích & Nhận Diện Hình Ảnh")
@@ -121,10 +121,10 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
         st.image(image, caption="Hình ảnh đã tải lên", use_container_width=True)
         
         if vision_engine == "Amazon Web Services (AWS Rekognition)":
-            # Phần AWS cực kỳ đơn giản: chỉ quét nhãn mộc mạc
             if st.button("🔍 Quét nhãn đơn giản với AWS"):
                 with st.spinner("AWS Rekognition đang quét nhãn..."):
                     try:
+                        # Khởi tạo client chuẩn xác, không bị dính token thừa
                         rek_client = boto3.client(
                             'rekognition',
                             aws_access_key_id=AWS_ACCESS_KEY_ID,
@@ -153,7 +153,6 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                         st.error(f"Lỗi AWS Rekognition: {e}")
                             
         else:
-            # Phần Gemini giữ nguyên vẹn tính năng phân tích chi tiết đầy đủ
             if st.button("🔍 Phân tích chi tiết với Gemini"):
                 if not GEMINI_API_KEYS:
                     st.error("Chưa cấu hình API Key trong Secrets!")
