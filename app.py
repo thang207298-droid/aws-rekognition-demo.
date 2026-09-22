@@ -21,7 +21,7 @@ AWS_DEFAULT_REGION = st.secrets.get("AWS_DEFAULT_REGION", "us-east-1")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
-# Sử dụng Gemini 3.6 Flash
+# Sử dụng model Gemini 3.6 Flash
 GEMINI_MODEL_NAME = "gemini-3.6-flash"
 
 # ==========================================
@@ -38,18 +38,18 @@ feature = st.sidebar.radio(
 # ==========================================
 if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
     st.title("🎙️ Bóc Băng & Phân Tích Ngữ Cảnh Âm Thanh")
-    st.caption("Sử dụng Gemini 3.6 Flash để chép lời, dịch tiếng Việt và phân tích ngữ cảnh chi tiết.")
+    st.caption("Liệt kê nội dung audio, bản dịch Tiếng Việt và tổng kết mục đích cụ thể của cuộc trò chuyện.")
 
     uploaded_audio = st.file_uploader("Tải lên file Audio (MP3, WAV, M4A)", type=["mp3", "wav", "m4a"])
 
     if uploaded_audio is not None:
         st.audio(uploaded_audio)
         
-        if st.button("🚀 Bóc băng & Phân tích ngữ cảnh"):
+        if st.button("🚀 Bóc băng & Phân tích"):
             if not GEMINI_API_KEY:
                 st.error("Chưa cấu hình GEMINI_API_KEY trong Secrets!")
             else:
-                with st.spinner("Gemini 3.6 Flash đang lắng nghe, chép lời và phân tích ngữ cảnh..."):
+                with st.spinner("Gemini 3.6 Flash đang phân tích âm thanh..."):
                     try:
                         audio_bytes = uploaded_audio.read()
                         file_ext = uploaded_audio.name.split(".")[-1].lower()
@@ -57,13 +57,18 @@ if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
                         
                         model = genai.GenerativeModel(GEMINI_MODEL_NAME)
                         
-                        # Prompt phân tích sâu: Chép lời, dịch nghĩa & giải thích ngữ cảnh
+                        # Prompt tinh chỉnh theo đúng yêu cầu: không đánh số 1234, tập trung vào bản chép + bản dịch + mục đích
                         prompt = """
-                        Hãy xử lý file âm thanh này theo các yêu cầu sau:
-                        1. Chép lại chính xác toàn bộ lời nói bằng ngôn ngữ gốc (ví dụ: Tiếng Anh/Tiếng Việt).
-                        2. Dịch từng câu thoại sang tiếng Việt (đặt trong ngoặc đơn hoặc in nghiêng).
-                        3. Phân tích ngắn gọn ngữ cảnh, thái độ/ý định của người nói hoặc ý nghĩa của đoạn hội thoại.
-                        Format trình bày rõ ràng, dễ nhìn từng câu/đoạn.
+                        Hãy phân tích file âm thanh này và trình bày kết quả theo cấu trúc sau:
+
+                        ### 📝 NỘI DUNG LỜI THOẠI (TRANSCRIPTION):
+                        (Liệt kê lại toàn bộ các câu thoại bằng ngôn ngữ gốc trong audio, KHÔNG sử dụng đánh số thứ tự 1, 2, 3...)
+
+                        ### 🌐 BẢN DỊCH TIẾNG VIỆT:
+                        (Dịch lại toàn bộ nội dung lời thoại trên sang Tiếng Việt một cách tự nhiên và chính xác)
+
+                        ### 🎯 MỤC ĐÍCH CỤ THỂ CỦA CUỘC TRÒ CHUYỆN:
+                        (Phân tích và nêu rõ: Cuộc trò chuyện này nhằm mục đích gì? Bối cảnh diễn ra là gì? Ý định/thái độ chính của những người tham gia giao tiếp là gì?)
                         """
                         
                         response = model.generate_content([
@@ -71,7 +76,7 @@ if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
                             {"mime_type": mime_type, "data": audio_bytes}
                         ])
                         
-                        st.success("✅ Phân tích âm thanh thành công!")
+                        st.success("✅ Phân tích thành công!")
                         st.markdown(response.text)
                     except Exception as e:
                         st.error(f"Lỗi xử lý âm thanh: {e}")
