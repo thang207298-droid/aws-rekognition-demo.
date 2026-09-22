@@ -12,7 +12,7 @@ import boto3
 
 # Cấu hình trang Streamlit
 st.set_page_config(page_title="Cloud AI Comparison Demo", layout="centered")
-st.title("☁️ Demo So Sánh AI: Google Cloud vs AWS")
+st.title("☁️ AI Nhận Diện Hình Ảnh Và Âm Thanh")
 
 # Lấy cấu hình từ Streamlit Secrets
 gemini_api_key = st.secrets.get("GEMINI_API_KEY")
