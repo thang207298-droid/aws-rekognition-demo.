@@ -1,127 +1,141 @@
 import streamlit as st
 import boto3
-import time
-import requests
+from PIL import Image
+import io
+import google.generativeai as genai
 
 # ==========================================
-# 1. CẤU HÌNH & KHỞI TẠO AWS CLIENTS TỪ SECRETS
+# 1. CẤU HÌNH TRANG VÀ API KEYS
 # ==========================================
-try:
-    AWS_ACCESS_KEY_ID = st.secrets["AWS_ACCESS_KEY_ID"]
-    AWS_SECRET_ACCESS_KEY = st.secrets["AWS_SECRET_ACCESS_KEY"]
-    AWS_DEFAULT_REGION = st.secrets.get("AWS_DEFAULT_REGION", "us-east-1")
-    AWS_S3_BUCKET_NAME = st.secrets["AWS_S3_BUCKET_NAME"]
-    GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
-except Exception as e:
-    st.error(f"Lỗi cấu hình Secrets: {e}. Vui lòng kiểm tra lại thiết lập Secrets trên Streamlit Community Cloud.")
-    st.stop()
-
-# Khởi tạo S3 Client với Region được lấy động từ Secrets
-s3_client = boto3.client(
-    's3',
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    region_name=AWS_DEFAULT_REGION
+st.set_page_config(
+    page_title="AI Analysis Dashboard - AWS & Gemini",
+    page_icon="🤖",
+    layout="wide"
 )
 
-# Khởi tạo Transcribe Client với Region lấy động từ Secrets (Tránh lỗi SubscriptionRequiredException)
-transcribe_client = boto3.client(
-    'transcribe',
-    aws_access_key_id=AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-    region_name=AWS_DEFAULT_REGION
-)
+st.title("🤖 AI Multimodal Assistant")
+st.write("Xử lý Hình ảnh bằng **AWS Rekognition** | Bóc băng Âm thanh bằng **Gemini Flash API**")
 
-
-# ==========================================
-# 2. CÁC HÀM XỬ LÝ S3 & AWS TRANSCRIBE
-# ==========================================
-def upload_file_to_s3(file_bytes, file_name):
-    """Tải file âm thanh/video lên S3 Bucket"""
-    s3_key = f"transcribe-uploads/{int(time.time())}_{file_name}"
-    s3_client.put_object(
-        Bucket=AWS_S3_BUCKET_NAME,
-        Key=s3_key,
-        Body=file_bytes
-    )
-    s3_uri = f"s3://{AWS_S3_BUCKET_NAME}/{s3_key}"
-    return s3_uri
-
-def run_transcribe_job(s3_uri, media_format='mp3'):
-    """Tạo và theo dõi Transcribe Job"""
-    job_name = f"TranscribeJob_{int(time.time())}"
-    
-    transcribe_client.start_transcription_job(
-        TranscriptionJobName=job_name,
-        Media={'MediaFileUri': s3_uri},
-        MediaFormat=media_format,
-        LanguageCode='vi-VN'  # Mặc định tiếng Việt (đổi thành 'en-US' nếu là tiếng Anh)
-    )
-    
-    # Chờ Transcribe hoàn thành
-    with st.spinner("Đang xử lý bóc băng âm thanh qua AWS Transcribe..."):
-        while True:
-            status = transcribe_client.get_transcription_job(TranscriptionJobName=job_name)
-            job_status = status['TranscriptionJob']['TranscriptionJobStatus']
-            
-            if job_status in ['COMPLETED', 'FAILED']:
-                break
-            time.sleep(3)
-            
-    if job_status == 'COMPLETED':
-        transcript_file_uri = status['TranscriptionJob']['Transcript']['TranscriptFileUri']
-        response = requests.get(transcript_file_uri)
-        result_json = response.json()
-        transcript_text = result_json['results']['transcripts'][0]['transcript']
-        return transcript_text
-    else:
-        failure_reason = status['TranscriptionJob'].get('FailureReason', 'Không rõ nguyên nhân')
-        raise Exception(f"Transcribe Job thất bại: {failure_reason}")
-
-
-# ==========================================
-# 3. GIAO DIỆN STREAMLIT
-# ==========================================
-st.set_page_config(page_title="AI Nhận Diện Hình Ảnh Và Âm Thanh", layout="wide")
-
-st.title("☁️ AI Nhận Diện Hình Ảnh Và Âm Thanh")
-
-# Sidebar
+# Cấu hình Gemini API
+# Bạn có thể lưu key trong .streamlit/secrets.toml hoặc nhập trực tiếp trên Sidebar
 with st.sidebar:
-    st.header("Chọn nền tảng Cloud Demo:")
-    platform = st.radio("", ["1. Google Cloud (Gemini AI)", "2. Amazon Web Services (AWS Native)"], index=1)
-    
-    st.header("Chọn loại dữ liệu xử lý:")
-    data_type = st.selectbox("", ["Bóc Bằng Âm Thanh / Video", "Nhận diện Hình ảnh"])
+    st.header("🔑 Cấu hình API Keys")
+    gemini_key = st.text_input("Gemini API Key", type="password", value=st.secrets.get("GEMINI_API_KEY", ""))
+    aws_access_key = st.text_input("AWS Access Key ID", type="password", value=st.secrets.get("AWS_ACCESS_KEY_ID", ""))
+    aws_secret_key = st.text_input("AWS Secret Access Key", type="password", value=st.secrets.get("AWS_SECRET_ACCESS_KEY", ""))
+    aws_region = st.selectbox("AWS Region", ["us-east-1", "us-west-2", "ap-southeast-1"], index=0)
 
-if platform == "2. Amazon Web Services (AWS Native)":
-    st.header("🟠 Amazon Web Services (AWS Rekognition & Transcribe)")
+    if gemini_key:
+        genai.configure(api_key=gemini_key)
+
+# Khởi tạo boto3 client cho AWS Rekognition
+def get_rekognition_client():
+    if aws_access_key and aws_secret_key:
+        return boto3.client(
+            'rekognition',
+            aws_access_key_id=aws_access_key,
+            aws_secret_access_key=aws_secret_key,
+            region_name=aws_region
+        )
+    return None
+
+# ==========================================
+# 2. CHỨC NĂNG 1: BÓC BĂNG ÂM THANH (GEMINI FLASH)
+# ==========================================
+st.header("🎙️ 1. Chép lời từ File Âm thanh (Gemini Audio Transcribe)")
+
+audio_file = st.file_uploader("Tải lên file âm thanh (MP3, WAV, M4A, OGG)", type=["mp3", "wav", "m4a", "ogg"])
+
+if audio_file is not None:
+    st.audio(audio_file)
     
-    st.info("📌 AWS Transcribe lưu trữ file vào S3 Bucket trước khi trích xuất lời nói.")
-    
-    uploaded_file = st.file_uploader("Tải lên Audio (MP3, WAV)", type=["mp3", "wav", "m4a"])
-    
-    if uploaded_file is not None:
-        st.audio(uploaded_file)
-        
-        if st.button("🚀 Bóc băng với AWS Transcribe"):
-            try:
-                # 1. Tải file lên S3
-                with st.spinner("Đang tải file lên S3 Bucket..."):
-                    file_bytes = uploaded_file.read()
-                    s3_uri = upload_file_to_s3(file_bytes, uploaded_file.name)
-                
-                # 2. Xác định định dạng file
-                ext = uploaded_file.name.split(".")[-1].lower()
-                media_format = ext if ext in ["mp3", "wav", "m4a"] else "mp3"
-                
-                # 3. Gọi AWS Transcribe
-                transcript = run_transcribe_job(s3_uri, media_format=media_format)
-                
-                # 4. Hiển thị kết quả
-                st.success("✅ Bóc băng thành công!")
-                st.subheader("Trích xuất văn bản:")
-                st.write(transcript)
-                
-            except Exception as e:
-                st.error(f"Lỗi AWS Transcribe: {e}")
+    if st.button("🚀 Bóc băng âm thanh với Gemini"):
+        if not gemini_key:
+            st.error("Vui lòng nhập Gemini API Key ở thanh bên trái!")
+        else:
+            with st.spinner("Gemini đang lắng nghe và bóc băng..."):
+                try:
+                    # Đọc bytes từ file âm thanh
+                    audio_bytes = audio_file.read()
+                    file_ext = audio_file.name.split(".")[-1].lower()
+                    mime_type = f"audio/{file_ext}" if file_ext != "mp3" else "audio/mpeg"
+
+                    # Dùng model Gemini Flash (Tự động nhận diện bản 2.5/3.6 Flash mới nhất)
+                    model = genai.GenerativeModel("gemini-2.5-flash")
+
+                    # Gửi prompt kèm file audio đến Gemini
+                    response = model.generate_content([
+                        "Hãy chép lại chính xác toàn bộ lời nói trong file âm thanh này sang văn bản tiếng Việt.",
+                        {"mime_type": mime_type, "data": audio_bytes}
+                    ])
+
+                    st.success("✅ Hoàn thành bóc băng!")
+                    st.text_area("Kết quả Văn bản (Transcript):", value=response.text, height=200)
+
+                except Exception as e:
+                    st.error(f"Lỗi khi xử lý âm thanh: {e}")
+
+st.divider()
+
+# ==========================================
+# 3. CHỨC NĂNG 2: PHÂN TÍCH HÌNH ẢNH (AWS REKOGNITION + GEMINI)
+# ==========================================
+st.header("🖼️ 2. Phân tích Hình ảnh (AWS Rekognition & Gemini)")
+
+image_file = st.file_uploader("Tải lên hình ảnh (JPG, JPEG, PNG)", type=["jpg", "jpeg", "png"])
+
+if image_file is not None:
+    image = Image.open(image_file)
+    st.image(image, caption="Ảnh đã tải lên", use_container_width=True)
+
+    col1, col2 = st.columns(2)
+
+    # --- NHÁNH 1: DÙNG AWS REKOGNITION ---
+    with col1:
+        st.subheader("🟠 AWS Rekognition")
+        if st.button("Phân tích Nhãn (Labels) qua AWS"):
+            rek_client = get_rekognition_client()
+            if not rek_client:
+                st.error("Vui lòng nhập đầy đủ AWS Credentials ở thanh bên!")
+            else:
+                with st.spinner("AWS đang quét ảnh..."):
+                    try:
+                        # Chuyển ảnh PIL thành Bytes
+                        buffer = io.BytesIO()
+                        image.save(buffer, format=image.format if image.format else "JPEG")
+                        img_bytes = buffer.getvalue()
+
+                        # Gọi dịch vụ AWS Rekognition detect_labels
+                        response = rek_client.detect_labels(
+                            Image={'Bytes': img_bytes},
+                            MaxLabels=10,
+                            MinConfidence=70
+                        )
+
+                        st.write("**Các đối tượng phát hiện được:**")
+                        for label in response['Labels']:
+                            st.write(f"- **{label['Name']}**: {label['Confidence']:.2f}%")
+
+                    except Exception as e:
+                        st.error(f"Lỗi AWS Rekognition: {e}")
+
+    # --- NHÁNH 2: DÙNG GEMINI CHO HÌNH ẢNH ---
+    with col2:
+        st.subheader("🔵 Gemini Flash Vision")
+        if st.button("Mô tả ảnh chi tiết qua Gemini"):
+            if not gemini_key:
+                st.error("Vui lòng nhập Gemini API Key!")
+            else:
+                with st.spinner("Gemini đang xem ảnh..."):
+                    try:
+                        model = genai.GenerativeModel("gemini-2.5-flash")
+                        response = model.generate_content([
+                            "Hãy mô tả chi tiết nội dung bức ảnh này bằng tiếng Việt.",
+                            image
+                        ])
+
+                        st.write("**Mô tả chi tiết:**")
+                        st.write(response.text)
+
+                    except Exception as e:
+                        st.error(f"Lỗi Gemini Vision: {e}")
