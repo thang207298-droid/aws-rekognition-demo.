@@ -13,16 +13,44 @@ st.set_page_config(
     layout="wide"
 )
 
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
+# Đọc danh sách các API Key từ secrets.toml
+GEMINI_API_KEYS = st.secrets.get("GEMINI_API_KEYS", [])
+if not GEMINI_API_KEYS:
+    # Fallback nếu bạn chỉ lỡ lưu 1 key kiểu cũ
+    single_key = st.secrets.get("GEMINI_API_KEY", "")
+    GEMINI_API_KEYS = [single_key] if single_key else []
+
 AWS_ACCESS_KEY_ID = st.secrets.get("AWS_ACCESS_KEY_ID", "")
 AWS_SECRET_ACCESS_KEY = st.secrets.get("AWS_SECRET_ACCESS_KEY", "")
 AWS_DEFAULT_REGION = st.secrets.get("AWS_DEFAULT_REGION", "us-east-1")
 
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-
-# Sử dụng chuẩn model Gemini 3.6 Flash
 GEMINI_MODEL_NAME = "gemini-3.6-flash"
+
+# Hàm gọi Gemini tự động xoay vòng key khi gặp lỗi hết quota (429)
+def call_gemini_with_fallback(prompt_content):
+    if not GEMINI_API_KEYS:
+        raise Exception("Chưa cấu hình bất kỳ GEMINI_API_KEYS nào trong secrets.toml!")
+    
+    last_exception = None
+    # Duyệt qua từng key trong danh sách (Key chính trước, đến các key dự phòng)
+    for idx, key in enumerate(GEMINI_API_KEYS):
+        try:
+            genai.configure(api_key=key)
+            model = genai.GenerativeModel(GEMINI_MODEL_NAME)
+            response = model.generate_content(prompt_content)
+            return response.text # Thành công thì trả về kết quả luôn
+        except Exception as e:
+            last_exception = e
+            error_str = str(e)
+            # Nếu gặp lỗi 429 (hết quota), in cảnh báo và thử sang key tiếp theo
+            if "429" in error_str or "quota" in error_str.lower():
+                st.warning(f"⚠️ Key số {idx + 1} đã hết hạn mức (429). Đang tự động chuyển sang key dự phòng...")
+                continue
+            else:
+                # Nếu là lỗi khác (không phải do quota) thì ném lỗi luôn
+                raise e
+                
+    raise Exception(f"Tất cả các API Key đều đã cạn kiệt hạn mức hoặc gặp lỗi: {last_exception}")
 
 # ==========================================
 # SIDEBAR MENU
@@ -46,16 +74,14 @@ if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
         st.audio(uploaded_audio)
         
         if st.button("🚀 Bóc băng & Phân tích"):
-            if not GEMINI_API_KEY:
-                st.error("Chưa cấu hình GEMINI_API_KEY trong Secrets!")
+            if not GEMINI_API_KEYS:
+                st.error("Chưa cấu hình API Key trong Secrets!")
             else:
-                with st.spinner("Gemini 3.6 Flash đang phân tích..."):
+                with st.spinner("Đang phân tích âm thanh (tự động kiểm tra key dự phòng)..."):
                     try:
                         audio_bytes = uploaded_audio.read()
                         file_ext = uploaded_audio.name.split(".")[-1].lower()
                         mime_type = f"audio/{file_ext}" if file_ext != "mp3" else "audio/mpeg"
-                        
-                        model = genai.GenerativeModel(GEMINI_MODEL_NAME)
                         
                         prompt = """
                         Hãy phân tích file âm thanh này theo cấu trúc ngắn gọn sau:
@@ -70,13 +96,14 @@ if feature == "🎙️ Bóc Băng & Phân Tích Âm Thanh (Gemini AI)":
                         (Chỉ viết ĐÚNG 1 DÒNG kết luận chung ngắn gọn nhất về mục đích của đoạn hội thoại này).
                         """
                         
-                        response = model.generate_content([
+                        # Gọi hàm bọc có sẵn cơ chế fallback dự phòng key
+                        result_text = call_gemini_with_fallback([
                             prompt,
                             {"mime_type": mime_type, "data": audio_bytes}
                         ])
                         
                         st.success("✅ Phân tích thành công!")
-                        st.markdown(response.text)
+                        st.markdown(result_text)
                     except Exception as e:
                         st.error(f"Lỗi xử lý âm thanh: {e}")
 
@@ -98,7 +125,7 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
         image = Image.open(uploaded_img)
         st.image(image, caption="Hình ảnh đã tải lên", use_container_width=True)
         
-        # Nhánh AWS Rekognition (Quét nhãn + Tự động kết luận thông minh qua Gemini)
+        # Nhánh AWS Rekognition + Gemini tóm tắt
         if vision_engine == "Amazon Web Services (AWS Rekognition)":
             if st.button("🔍 Phân tích Nhãn & Kết luận với AWS"):
                 if not (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY):
@@ -130,43 +157,37 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                             st.write("**Các đối tượng phát hiện được:**")
                             st.markdown(labels_text)
                             
-                            if GEMINI_API_KEY:
-                                with st.spinner("Đang tổng hợp kết luận từ AWS Labels..."):
-                                    model = genai.GenerativeModel(GEMINI_MODEL_NAME)
+                            if GEMINI_API_KEYS:
+                                with st.spinner("Đang tổng hợp kết luận bằng Gemini (có dùng key dự phòng)..."):
                                     summary_prompt = f"""
                                     Dựa vào các nhãn nhận diện được từ AWS Rekognition sau đây:
                                     {labels_text}
                                     
                                     Hãy viết ĐÚNG 1 DÒNG kết luận chung ngắn gọn nhất bằng tiếng Việt về bức ảnh này.
                                     """
-                                    sum_res = model.generate_content(summary_prompt)
+                                    sum_text = call_gemini_with_fallback(summary_prompt)
                                     st.markdown("### 🎯 KẾT LUẬN CHUNG:")
-                                    st.markdown(sum_res.text)
+                                    st.markdown(sum_text)
                             
                         except Exception as e:
                             st.error(f"Lỗi AWS Rekognition: {e}")
                             
-        # Nhánh Gemini AI Flash (Vision)
+        # Nhánh Gemini Vision
         else:
             if st.button("🔍 Mô tả ảnh với Gemini"):
-                if not GEMINI_API_KEY:
-                    st.error("Chưa cấu hình GEMINI_API_KEY dalam Secrets!") # Fallback or keep language consistent
+                if not GEMINI_API_KEYS:
+                    st.error("Chưa cấu hình API Key trong Secrets!")
                 else:
-                    with st.spinner("Gemini 3.6 Flash đang xem ảnh..."):
+                    with st.spinner("Gemini đang xem ảnh (tự động kiểm tra key dự phòng)..."):
                         try:
-                            model = genai.GenerativeModel(GEMINI_MODEL_NAME)
-                            
                             vision_prompt = """
                             Hãy phân tích hình ảnh này theo cấu trúc ngắn gọn:
                             - **Mô tả ngắn**: Liệt kê các đối tượng và chi tiết chính nổi bật trong ảnh.
                             - **Kết luận**: Viết đúng 1 dòng tổng kết ngắn gọn nhất về bản chất/nội dung của hình ảnh này.
                             """
                             
-                            response = model.generate_content([
-                                vision_prompt,
-                                image
-                            ])
+                            result_text = call_gemini_with_fallback([vision_prompt, image])
                             st.success("✅ Phân tích xong!")
-                            st.markdown(response.text)
+                            st.markdown(result_text)
                         except Exception as e:
                             st.error(f"Lỗi Gemini Vision: {e}")
