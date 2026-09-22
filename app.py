@@ -19,8 +19,9 @@ if not GEMINI_API_KEYS:
     single_key = st.secrets.get("GEMINI_API_KEY", "")
     GEMINI_API_KEYS = [single_key] if single_key else []
 
-AWS_ACCESS_KEY_ID = st.secrets.get("AWS_ACCESS_KEY_ID", "")
-AWS_SECRET_ACCESS_KEY = st.secrets.get("AWS_SECRET_ACCESS_KEY", "")
+# Lấy trực tiếp thông tin AWS chuẩn xác từ secrets.toml
+AWS_ACCESS_KEY_ID = st.secrets["AWS_ACCESS_KEY_ID"]
+AWS_SECRET_ACCESS_KEY = st.secrets["AWS_SECRET_ACCESS_KEY"]
 AWS_DEFAULT_REGION = st.secrets.get("AWS_DEFAULT_REGION", "us-east-1")
 
 GEMINI_MODEL_NAME = "gemini-3.6-flash"
@@ -121,55 +122,47 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
         
         if vision_engine == "Amazon Web Services (AWS Rekognition)":
             if st.button("🔍 Phân tích Nhãn & Kết luận với AWS"):
-                if not (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY):
-                    st.error("Chưa cấu hình AWS Credentials trong Secrets!")
-                else:
-                    with st.spinner("AWS Rekognition đang quét nhãn..."):
-                        try:
-                            # Làm sạch chuỗi tuyệt đối để chống lỗi ký tự ẩn
-                            clean_id = AWS_ACCESS_KEY_ID.strip().strip('"').strip("'")
-                            clean_secret = AWS_SECRET_ACCESS_KEY.strip().strip('"').strip("'")
-                            clean_region = AWS_DEFAULT_REGION.strip().strip('"').strip("'")
-                            
-                            rek_client = boto3.client(
-                                'rekognition',
-                                aws_access_key_id=clean_id,
-                                aws_secret_access_key=clean_secret,
-                                region_name=clean_region
-                            )
-                            
-                            buffer = io.BytesIO()
-                            image.save(buffer, format=image.format if image.format else "JPEG")
-                            img_bytes = buffer.getvalue()
-                            
-                            res = rek_client.detect_labels(
-                                Image={'Bytes': img_bytes},
-                                MaxLabels=10,
-                                MinConfidence=70
-                            )
-                            
-                            labels_list = [f"- **{l['Name']}**: {l['Confidence']:.2f}%" for l in res['Labels']]
-                            labels_text = "\n".join(labels_list)
-                            
-                            st.success("✅ Phân tích nhãn AWS thành công!")
-                            st.write("**Các đối tượng phát hiện được:**")
-                            st.markdown(labels_text)
-                            
-                            if GEMINI_API_KEYS:
-                                with st.spinner("Đang tổng hợp kết luận..."):
-                                    summary_prompt = f"""
-                                    Dựa vào các nhãn nhận diện được từ AWS Rekognition sau đây:
-                                    {labels_text}
-                                    
-                                    Hãy viết ĐÚNG 1 DÒNG kết luận chung ngắn gọn nhất bằng tiếng Việt về bức ảnh này.
-                                    """
-                                    sum_text = call_gemini_with_fallback(summary_prompt)
-                                    st.markdown("### 🎯 KẾT LUẬN CHUNG:")
-                                    st.markdown(sum_text)
-                            
-                        except Exception as e:
-                            st.error(f"Lỗi AWS Rekognition: {e}")
-                            st.info("💡 Mẹo: Hãy kiểm tra lại cặp Access Key / Secret Key trên AWS Console xem đã bị đổi mới hoặc khóa chưa nhé!")
+                with st.spinner("AWS Rekognition đang quét nhãn..."):
+                    try:
+                        # Trở lại hoàn toàn cách gọi boto3 trực tiếp như lúc đầu chạy thành công
+                        rek_client = boto3.client(
+                            'rekognition',
+                            aws_access_key_id=AWS_ACCESS_KEY_ID,
+                            aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+                            region_name=AWS_DEFAULT_REGION
+                        )
+                        
+                        buffer = io.BytesIO()
+                        image.save(buffer, format=image.format if image.format else "JPEG")
+                        img_bytes = buffer.getvalue()
+                        
+                        res = rek_client.detect_labels(
+                            Image={'Bytes': img_bytes},
+                            MaxLabels=10,
+                            MinConfidence=70
+                        )
+                        
+                        labels_list = [f"- **{l['Name']}**: {l['Confidence']:.2f}%" for l in res['Labels']]
+                        labels_text = "\n".join(labels_list)
+                        
+                        st.success("✅ Phân tích nhãn AWS thành công!")
+                        st.write("**Các đối tượng phát hiện được:**")
+                        st.markdown(labels_text)
+                        
+                        if GEMINI_API_KEYS:
+                            with st.spinner("Đang tổng hợp kết luận..."):
+                                summary_prompt = f"""
+                                Dựa vào các nhãn nhận diện được từ AWS Rekognition sau đây:
+                                {labels_text}
+                                
+                                Hãy viết ĐÚNG 1 DÒNG kết luận chung ngắn gọn nhất bằng tiếng Việt về bức ảnh này.
+                                """
+                                sum_text = call_gemini_with_fallback(summary_prompt)
+                                st.markdown("### 🎯 KẾT LUẬN CHUNG:")
+                                st.markdown(sum_text)
+                        
+                    except Exception as e:
+                        st.error(f"Lỗi AWS Rekognition: {e}")
                             
         else:
             if st.button("🔍 Mô tả ảnh với Gemini"):
