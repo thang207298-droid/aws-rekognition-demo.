@@ -51,7 +51,6 @@ if option == "1. Phân Tích Hình Ảnh Đa Năng (Gemini Vision)":
             else:
                 try:
                     with st.spinner("AI đang quan sát và phân tích toàn bộ bức ảnh..."):
-                        # Khởi tạo client với API key
                         client = genai.Client(api_key=gemini_api_key.strip())
 
                         default_prompt = (
@@ -64,10 +63,9 @@ if option == "1. Phân Tích Hình Ảnh Đa Năng (Gemini Vision)":
 
                         prompt_to_use = user_prompt if user_prompt.strip() else default_prompt
 
-                        # Sử dụng mô hình gemini-2.5-flash
-                       response = client.models.generate_content(
-    model="gemini-3.6-flash",
-    contents=[image, prompt_to_use]
+                        response = client.models.generate_content(
+                            model="gemini-3.6-flash",
+                            contents=[image, prompt_to_use]
                         )
 
                         st.success("Phân tích hoàn tất!")
