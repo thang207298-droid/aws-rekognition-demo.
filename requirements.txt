@@ -1,6 +1,5 @@
 streamlit
-boto3
 pillow
-SpeechRecognition
-pydub
 google-genai
+boto3
+requests
