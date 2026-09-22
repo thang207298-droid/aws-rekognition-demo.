@@ -66,7 +66,7 @@ if option == "1. Phân Tích Hình Ảnh Toàn Diện (Vision AI)":
                         prompt_to_use = user_prompt if user_prompt.strip() else default_prompt
 
                         response = client.models.generate_content(
-                            model="gemini-2.5-flash",
+                            model="gemini-3.6-flash",
                             contents=[image, prompt_to_use]
                         )
 
