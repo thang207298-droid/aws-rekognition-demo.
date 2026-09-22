@@ -5,7 +5,7 @@ import io
 import google.generativeai as genai
 
 # ==========================================
-# CẤU HÌNH TRANG & SECRETS (GEMINI)
+# CẤU HÌNH TRANG & SECRETS
 # ==========================================
 st.set_page_config(
     page_title="AI Application - Vision & Audio",
@@ -21,14 +21,12 @@ if not GEMINI_API_KEYS:
 
 GEMINI_MODEL_NAME = "gemini-3.6-flash"
 
-# ==========================================
-# HARDCODE TRỰC TIẾP CẶP AWS KEYS MỚI NHẤT
-# ==========================================
+# Hardcode key AWS mới nhất để chạy trực tiếp không lỗi
 AWS_ACCESS_KEY_ID = "AKIATNDZHVIUDDTTJLWK"
 AWS_SECRET_ACCESS_KEY = "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"
 AWS_DEFAULT_REGION = "us-east-1"
 
-# Hàm gọi Gemini tự động xoay vòng key khi gặp lỗi hết quota (429)
+# Hàm gọi Gemini tự động xoay vòng key khi hết quota (429)
 def call_gemini_with_fallback(prompt_content):
     if not GEMINI_API_KEYS:
         raise Exception("Chưa cấu hình bất kỳ GEMINI_API_KEYS nào trong secrets.toml!")
@@ -105,7 +103,7 @@ if feature == "🎙️ AI Nhận Diện Âm Thanh":
                         st.error(f"Lỗi xử lý âm thanh: {e}")
 
 # ==========================================
-# TÍNH NĂNG 2: PHÂN TÍCH HÌNH ẢNH
+# TÍNH NĂNG 2: PHÂN TÍCH HÌNH ẢNH (AWS HOẶC GEMINI GIỮ NGUYÊN)
 # ==========================================
 elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
     st.title("🖼️ Phân Tích & Nhận Diện Hình Ảnh")
@@ -123,7 +121,8 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
         st.image(image, caption="Hình ảnh đã tải lên", use_container_width=True)
         
         if vision_engine == "Amazon Web Services (AWS Rekognition)":
-            if st.button("🔍 Phân tích Nhãn & Kết luận với AWS"):
+            # Phần AWS cực kỳ đơn giản: chỉ quét nhãn mộc mạc
+            if st.button("🔍 Quét nhãn đơn giản với AWS"):
                 with st.spinner("AWS Rekognition đang quét nhãn..."):
                     try:
                         rek_client = boto3.client(
@@ -144,29 +143,18 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                         )
                         
                         labels_list = [f"- **{l['Name']}**: {l['Confidence']:.2f}%" for l in res['Labels']]
-                        labels_text = "\n".join(labels_list)
                         
-                        st.success("✅ Phân tích nhãn AWS thành công!")
+                        st.success("✅ Quét nhãn AWS thành công!")
                         st.write("**Các đối tượng phát hiện được:**")
-                        st.markdown(labels_text)
-                        
-                        if GEMINI_API_KEYS:
-                            with st.spinner("Đang tổng hợp kết luận..."):
-                                summary_prompt = f"""
-                                Dựa vào các nhãn nhận diện được từ AWS Rekognition sau đây:
-                                {labels_text}
-                                
-                                Hãy viết ĐÚNG 1 DÒNG kết luận chung ngắn gọn nhất bằng tiếng Việt về bức ảnh này.
-                                """
-                                sum_text = call_gemini_with_fallback(summary_prompt)
-                                st.markdown("### 🎯 KẾT LUẬN CHUNG:")
-                                st.markdown(sum_text)
-                        
+                        for item in labels_list:
+                            st.markdown(item)
+                            
                     except Exception as e:
                         st.error(f"Lỗi AWS Rekognition: {e}")
                             
         else:
-            if st.button("🔍 Mô tả ảnh với Gemini"):
+            # Phần Gemini giữ nguyên vẹn tính năng phân tích chi tiết đầy đủ
+            if st.button("🔍 Phân tích chi tiết với Gemini"):
                 if not GEMINI_API_KEYS:
                     st.error("Chưa cấu hình API Key trong Secrets!")
                 else:
