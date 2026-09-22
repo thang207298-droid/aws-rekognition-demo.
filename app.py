@@ -41,7 +41,7 @@ def call_gemini_with_fallback(prompt_content):
             last_exception = e
             error_str = str(e)
             if "429" in error_str or "quota" in error_str.lower():
-                continue # Tự động chuyển ngầm sang key tiếp theo mà không hiện dòng chữ dài dòng
+                continue
             else:
                 raise e
                 
@@ -126,11 +126,16 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                 else:
                     with st.spinner("AWS Rekognition đang quét nhãn..."):
                         try:
+                            # Tự động loại bỏ khoảng trắng ẩn để trị dứt điểm lỗi lệch chữ ký
+                            clean_aws_id = AWS_ACCESS_KEY_ID.strip()
+                            clean_aws_secret = AWS_SECRET_ACCESS_KEY.strip()
+                            clean_aws_region = AWS_DEFAULT_REGION.strip()
+                            
                             rek_client = boto3.client(
                                 'rekognition',
-                                aws_access_key_id=AWS_ACCESS_KEY_ID,
-                                aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-                                region_name=AWS_DEFAULT_REGION
+                                aws_access_key_id=clean_aws_id,
+                                aws_secret_access_key=clean_aws_secret,
+                                region_name=clean_aws_region
                             )
                             
                             buffer = io.BytesIO()
