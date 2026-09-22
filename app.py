@@ -21,6 +21,7 @@ AWS_DEFAULT_REGION = st.secrets.get("AWS_DEFAULT_REGION", "us-east-1")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
+# Sử dụng chuẩn model Gemini 3.6 Flash
 GEMINI_MODEL_NAME = "gemini-3.6-flash"
 
 # ==========================================
@@ -97,12 +98,13 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
         image = Image.open(uploaded_img)
         st.image(image, caption="Hình ảnh đã tải lên", use_container_width=True)
         
+        # Nhánh AWS Rekognition (Quét nhãn + Tự động kết luận thông minh qua Gemini)
         if vision_engine == "Amazon Web Services (AWS Rekognition)":
-            if st.button("🔍 Phân tích Nhãn với AWS"):
+            if st.button("🔍 Phân tích Nhãn & Kết luận với AWS"):
                 if not (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY):
                     st.error("Chưa cấu hình AWS Credentials trong Secrets!")
                 else:
-                    with st.spinner("AWS Rekognition đang quét ảnh..."):
+                    with st.spinner("AWS Rekognition đang quét nhãn..."):
                         try:
                             rek_client = boto3.client(
                                 'rekognition',
@@ -121,23 +123,39 @@ elif feature == "🖼️ Nhận Diện Hình Ảnh (AWS Rekognition / Gemini)":
                                 MinConfidence=70
                             )
                             
-                            st.success("✅ Phân tích nhãn thành công!")
+                            labels_list = [f"- **{l['Name']}**: {l['Confidence']:.2f}%" for l in res['Labels']]
+                            labels_text = "\n".join(labels_list)
+                            
+                            st.success("✅ Phân tích nhãn AWS thành công!")
                             st.write("**Các đối tượng phát hiện được:**")
-                            for label in res['Labels']:
-                                st.write(f"- **{label['Name']}**: {label['Confidence']:.2f}%")
+                            st.markdown(labels_text)
+                            
+                            if GEMINI_API_KEY:
+                                with st.spinner("Đang tổng hợp kết luận từ AWS Labels..."):
+                                    model = genai.GenerativeModel(GEMINI_MODEL_NAME)
+                                    summary_prompt = f"""
+                                    Dựa vào các nhãn nhận diện được từ AWS Rekognition sau đây:
+                                    {labels_text}
+                                    
+                                    Hãy viết ĐÚNG 1 DÒNG kết luận chung ngắn gọn nhất bằng tiếng Việt về bức ảnh này.
+                                    """
+                                    sum_res = model.generate_content(summary_prompt)
+                                    st.markdown("### 🎯 KẾT LUẬN CHUNG:")
+                                    st.markdown(sum_res.text)
+                            
                         except Exception as e:
                             st.error(f"Lỗi AWS Rekognition: {e}")
                             
+        # Nhánh Gemini AI Flash (Vision)
         else:
             if st.button("🔍 Mô tả ảnh với Gemini"):
                 if not GEMINI_API_KEY:
-                    st.error("Chưa cấu hình GEMINI_API_KEY trong Secrets!")
+                    st.error("Chưa cấu hình GEMINI_API_KEY dalam Secrets!") # Fallback or keep language consistent
                 else:
                     with st.spinner("Gemini 3.6 Flash đang xem ảnh..."):
                         try:
                             model = genai.GenerativeModel(GEMINI_MODEL_NAME)
                             
-                            # Prompt đã rút gọn, đi thẳng vào ý chính và có 1 dòng kết luận chung
                             vision_prompt = """
                             Hãy phân tích hình ảnh này theo cấu trúc ngắn gọn:
                             - **Mô tả ngắn**: Liệt kê các đối tượng và chi tiết chính nổi bật trong ảnh.
